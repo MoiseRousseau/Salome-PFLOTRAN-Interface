@@ -13,7 +13,7 @@
 #
 # Pflotran input file description :
 # line 1 : n_element n_node
-# line 2 to n_element+1 : code(T,P,W,H) list_of_node
+# line 2 to n_element+1 : code(T,Q,P,W,H) list_of_node
 # line n_element+2 to n_element+n_node+1 : x y z
 #
 # note : list of node in element line need to respect right hand rule
@@ -22,12 +22,20 @@
 # Tested only for tetrahedral meshes, until new update ...
 
 
+#TODO
+# check right hand rule for pyramid, prism
+# Check HDF5 input
+# add region
+# dialog box for path / ascii / region
+# 2D/3D automatic recognition
+
+
 
 def Pflotran_export(context):
   """Convert Salome DAT mesh to Pflotran readable ASCII grid
   And region as HDF5 file
   Need to add Pflotran HDF5 mesh file
-  Tested only for tetrahedral elements
+  Tested only for tetrahedral elements and hexahedron
   For other type support, need to update the check right hand rule function
   Export first from Salome to DAT file and convert to Pflotran after
   """
@@ -111,7 +119,7 @@ def Pflotran_export(context):
     
     
 
-def meshSalomeToPFlotranHDF5(name, folder, PFlotranOutputName, i, Mesh3D=True):
+  def meshSalomeToPFlotranHDF5(name, folder, PFlotranOutputName, i, Mesh3D=True):
     import h5py
     import gc
     
@@ -186,11 +194,11 @@ def meshSalomeToPFlotranHDF5(name, folder, PFlotranOutputName, i, Mesh3D=True):
     if i > 1:
     #TODO
       region_group = out.create_group("Regions")
-      
+
     return
 
 
-  
+
   def checkRightHandRule(elementType, elementNode, X, Y, Z):
     """
     right hand rule check, only for tetrahedron
@@ -198,19 +206,98 @@ def meshSalomeToPFlotranHDF5(name, folder, PFlotranOutputName, i, Mesh3D=True):
     method : contruct a plane with the 3 first points given, determine its equation
     and if over the plane (>0) it's ok
     """
-    from itertools import permutations
+    #from itertools import permutations
+    tol = 1e-8
+    
+    def pointsToVec(A,B):
+      """
+      Create a vector AB by giving node number (A,B)
+      """
+      vec = (X[B-1]-X[A-1], Y[B-1]-Y[A-1], Z[B-1]-Z[A-1])
+      return vec
+      
+    def computeProdVec(vecX,vecY):
+      prodVec = (vecX[1]*vecY[2]-vecY[1]*vecX[2], vecX[2]*vecY[0]-vecY[2]*vecX[0], vecX[0]*vecY[1]-vecY[0]*vecX[1])
+      return prodVec
+      
+    def computeDotVec(vecX,vecY):
+      dot = vecX[0]*vecY[0]+vecX[1]*vecY[1]+vecX[2]*vecY[2]
+      return dot
+      
+    def isPlan(A,B,C,D, tol = 1e-8):
+      vecX = pointsToVec(A, B)
+      vecY = pointsToVec(A, C)
+      prodVecXY = computeProdVec(vecX, vecY)
+      vecZ = pointsToVec(A, D)
+      prodVecXYZ = [abs(x) for x in computeProdVec(prodVecXY, vecZ)]
+      if sum(prodVecXYZ) < tol:
+        return True
+      else:
+        return False
+      
+    def findFourth(elementNode):
+      #1. first 3 point
+      A = elementNode[0]
+      B = elementNode[1]
+      C = elementNode[2]
+      elementNodeWork = [x for x in elementNode]
+      elementNodeWork.remove(elementNode[0])
+      elementNodeWork.remove(elementNode[1])
+      elementNodeWork.remove(elementNode[2])
+      #1. find fourth
+      for x in elementNodeWork:
+        if isPlan(A,B,C,x):
+          elementNodeWork.remove(x)
+          elementNode = [A,B,C,x]
+          #anticipe 3.
+          while not checkOrder(elementNode):
+            continue
+          while not checkOrder(elementNodeWork):
+            continue
+          elementNode.append(elementNodeWork)
+          return True
+      return False
+      
+    def checkOrder(elementList):
+      #dont forget all 4 points in the plan
+      #follow each point in the order
+      #if in the right order, all vectoriel product need to be in the same direction
+      vec1 = pointsToVec(elementList[0], elementList[1])
+      vec2 = pointsToVec(elementList[1], elementList[2])
+      prodVec12 = computeProdVec(vec1, vec2)
+      vec3 = pointsToVec(elementList[2], elementList[3])
+      prodVec23 = computeProdVec(vec2, vec3)
+      if computeDotVec(prodVec12,prodVec23) < 0: #not in the same direction
+        #here, mean that 3rd and 4th point are inversed
+        #make the draw and you will see
+        elementList = [elementList[0], elementList[1], elementList[3], elementList[2]]
+        return False
+      vec4 = pointsToVec(elementList[3], elementList[1])
+      prodVec34 = computeProdVec(vec3, vec4)
+      if computeDotVec(prodVec23,prodVec34) < 0:
+        #here, mean that 1st and 2nd point are diagonal
+        #make the draw and you will see, again
+        elementList = [elementList[0], elementList[2], elementList[1], elementList[3]]
+        return False
+      return True
+      
     
     if elementType == '304': #tetrahedron
-      vecX = (X[elementNode[1]-1]-X[elementNode[0]-1], Y[elementNode[1]-1]-Y[elementNode[0]-1], Z[elementNode[1]-1]-Z[elementNode[0]-1])
-      vecY = (X[elementNode[2]-1]-X[elementNode[0]-1], Y[elementNode[2]-1]-Y[elementNode[0]-1], Z[elementNode[2]-1]-Z[elementNode[0]-1])
-      vecZ = (X[elementNode[3]-1]-X[elementNode[0]-1], Y[elementNode[3]-1]-Y[elementNode[0]-1], Z[elementNode[3]-1]-Z[elementNode[0]-1])
-      prodVecXY = (vecX[1]*vecY[2]-vecY[1]*vecX[2], vecX[2]*vecY[0]-vecY[2]*vecX[0], vecX[0]*vecY[1]-vecY[0]*vecX[1])
-      dotXZ = prodVecXY[0]*vecZ[0]+prodVecXY[1]*vecZ[1]+prodVecXY[2]*vecZ[2]
+      vecX = pointsToVec(elementNode[0], elementNode[1])
+      vecY = pointsToVec(elementNode[0], elementNode[2])
+      vecZ = pointsToVec(elementNode[0], elementNode[3])
+      prodVecXY = computeProdVec(vecX, vecY)
+      dotXZ = computeDotVec(prodVecXY,vecZ)
+      #vecX = (X[elementNode[1]-1]-X[elementNode[0]-1], Y[elementNode[1]-1]-Y[elementNode[0]-1], Z[elementNode[1]-1]-Z[elementNode[0]-1])
+      #vecY = (X[elementNode[2]-1]-X[elementNode[0]-1], Y[elementNode[2]-1]-Y[elementNode[0]-1], Z[elementNode[2]-1]-Z[elementNode[0]-1])
+      #vecZ = (X[elementNode[3]-1]-X[elementNode[0]-1], Y[elementNode[3]-1]-Y[elementNode[0]-1], Z[elementNode[3]-1]-Z[elementNode[0]-1])
+      #prodVecXY = (vecX[1]*vecY[2]-vecY[1]*vecX[2], vecX[2]*vecY[0]-vecY[2]*vecX[0], vecX[0]*vecY[1]-vecY[0]*vecX[1])
+      #dotXZ = prodVecXY[0]*vecZ[0]+prodVecXY[1]*vecZ[1]+prodVecXY[2]*vecZ[2]
       if not dotXZ > 0: #right hand rule not respected !
         #inverse vertex 0 and 1 to turn in the right direction
         elementNode = [elementNode[1], elementNode[0], elementNode[2], elementNode[3]]
       return elementNode
-        
+      
         
     elif elementType == '305': #Wedge
       print('Element type not supported yet...')
@@ -219,11 +306,79 @@ def meshSalomeToPFlotranHDF5(name, folder, PFlotranOutputName, i, Mesh3D=True):
       
     elif elementType == '306': #Prism
       print('Element type not supported yet...')
+      
     elif elementType == '308': #hexahedron
-      print('Element type not supported yet...')
-    return False
-
-
+      #algorithm rule :
+      #1. take 3 first point and found 4th in the same plan
+      #2. check if all the other point are on the same side of the plan
+      #2bis. if not, take another point random point not selected and restart
+      #3. Organise points to "turn" in the same direction
+      #4. Check if normal point in the direction of other points
+      #5. Make other turn for left hand rule x,y,z,a
+      #6. 1x2y should be in the same plan
+      #6bis. if not, turn xyza
+      tol = 1e-8
+            
+      #1.
+      print('ini')
+      print(elementNode)
+      while not findFourth(elementNode):
+        elementToMove = elementNode.pop(-1)
+        elementNode.insert(2, elementToMove)
+      #2.
+      print('same plan')
+      print(elementNode)
+      normal = computeProdVec(pointsToVec(elementNode[0], elementNode[1]), pointsToVec(elementNode[1], elementNode[2])) #from 1 to 2, and from 2 to 3
+      ref = computeDotVec(normal, pointsToVec(elementNode[0], elementNode[4]))
+      for node in elementNode[5:]:
+        if ref*computeDotVec(normal, pointsToVec(elementNode[0], node)) < 0:
+          #2bis.
+          elementToMove = elementNode.pop(4) #random, so the 5th
+          elementNode.insert(2, elementToMove)
+          #repeat 1.
+          findFourth(elementNode)
+      
+      #3. already done in the findFourth function
+      print('bon cote')
+      print(elementNode)
+      
+      #4.
+      if ref < 0:
+        elementToMove = elementNode.pop(3)
+        elementNode.insert(1, elementToMove)
+        elementToMove = elementNode.pop(2)
+        elementNode.insert(3, elementToMove)
+      
+      #5.
+      print('autre point')
+      print(elementNode)
+      #recall convention of #2
+      normal = computeProdVec(pointsToVec(elementNode[0], elementNode[1]), pointsToVec(elementNode[1], elementNode[2])) #recalculate normal if change
+      #point are normally in the right order from findFourth function
+      normal2 = computeProdVec(pointsToVec(elementNode[4], elementNode[5]), pointsToVec(elementNode[5], elementNode[6]))
+      if computeDotVec(normal, normal2) < 0: #turn in the wrong direction
+        elementToMove = elementNode.pop(7)
+        elementNode.insert(5, elementToMove)
+        elementToMove = elementNode.pop(6)
+        elementNode.insert(7, elementToMove)
+      
+      #6.
+      print('autre point sens')
+      print(elementNode)
+      A = elementNode[0]
+      B = elementNode[4]
+      C = elementNode[5]
+      D = elementNode[1] 
+      while isPlan(A,B,C,D):
+        elementToMove = elementNode.pop(-1)
+        elementNode.insert(4, elementToMove)
+        A = elementNode[0]
+        B = elementNode[4]
+        C = elementNode[5]
+        D = elementNode[1]
+    print('ok')
+    print(elementNode)
+    return elementNode
 
 
   # get context study, studyId, salomeGui
@@ -269,8 +424,8 @@ def meshSalomeToPFlotranHDF5(name, folder, PFlotranOutputName, i, Mesh3D=True):
 
 
   #Convertion to Pflotran
-  asciiOut = False
-  hdf5Out = True
+  asciiOut = True
+  hdf5Out = False
   if asciiOut:
     meshSalomeToPFlotranAscii(activeFolder+'DAT_raw_mesh/'+name+'.dat', activeFolder+name+'.mesh')
     if i > 1:
