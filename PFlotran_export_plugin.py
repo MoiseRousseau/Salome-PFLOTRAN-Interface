@@ -17,14 +17,11 @@
 # line n_element+2 to n_element+n_node+1 : x y z
 #
 # note : list of node in element line need to respect right hand rule
-# for tetrahedron, the 4th need need to be in the direction of the right hand rule
 
-# Tested only for tetrahedral meshes, until new update ...
 
 
 #TODO
-# add right hand rule for prism
-# check pyramid
+# Test PFLOTRAN with case test
 # Check HDF5 input
 # add region
 # dialog box for path / ascii / region
@@ -101,6 +98,7 @@ def Pflotran_export(context):
     
     #pflotran line 2 to n_element_2D/3D +1
     for i in range(0, n_element_write):
+      elementType = line[1]
       out.write(elementCode[elementType] + ' ')
       elementNode = [int(x) for x in line[2:-1]]
       
@@ -169,7 +167,8 @@ def Pflotran_export(context):
     for i in range(0, n_element):
       elementArray = []
       idCorrespondance[i] = int(line[0])
-      elementArray.append(elementCode[ilne[1]])
+      elementType = line[1]
+      elementArray.append(elementCode[elementType])
       elementNode = [int(x) for x in line[2:-1]]
       elementNode = checkRightHandRule(elementType, elementNode, X, Y, Z)
       for x in elementNode:
@@ -203,9 +202,9 @@ def Pflotran_export(context):
 
   def checkRightHandRule(elementType, elementNode, X, Y, Z):
     """
-    right hand rule organize and check, only for tetrahedron and hex
-    TODO for other type
+    right hand rule organize and check
     """
+    #print(elementNode)
     
     def pointsToVec(A,B):
       """
@@ -223,11 +222,14 @@ def Pflotran_export(context):
       return dot
       
     def isPlan(A,B,C,D, tol = 1e-8):
+      if A==B or A==C or A==D: return False
+      if C==B or B==D or C==D: return False
       vecX = pointsToVec(A, B)
       vecY = pointsToVec(A, C)
       prodVecXY = computeProdVec(vecX, vecY)
       vecZ = pointsToVec(A, D)
-      prodVecXYZ = [abs(x) for x in computeProdVec(prodVecXY, vecZ)]
+      prodVecXZ = computeProdVec(vecX, vecZ)
+      prodVecXYZ = [abs(x) for x in computeProdVec(prodVecXY, prodVecXZ)]
       if sum(prodVecXYZ) < tol:
         return True
       else:
@@ -279,6 +281,30 @@ def Pflotran_export(context):
         return False
       return True
       
+    def separateTriangles(elementList):
+      for x2 in elementNode[1:]:
+        for x3 in [x for x in elementNode[1:] if x != x2]:
+          tri = [elementNode[0], x2, x3]
+          tri2 = [x for x in elementNode if not x in tri]
+          for x in tri2: #take the other
+            if not isPlan(tri[0],tri[1],tri[2],x): #if not in the plan
+              #separe the 2 triangles
+              vec1 = pointsToVec(tri[0],tri[1])
+              vec2 = pointsToVec(tri[1],tri[2])
+              normal = computeProdVec(vec1,vec2)
+              ref = computeDotVec(normal, pointsToVec(tri[0],tri2[0]))
+              for x in tri2[1:]: #check for same side
+                if computeDotVec(normal, pointsToVec(tri[0],x))*ref < 0:
+                  found = False
+                  break #if no, stop
+                found = True
+              if found: #we found it
+                if ref < 0: #not the right order
+                  tri = [tri[0],tri[2],tri[1]]
+                for x in tri2:
+                  tri.append(x)
+                return tri
+      
     
     if elementType == '304': #tetrahedron
       #method : compute normal and dot product
@@ -294,17 +320,16 @@ def Pflotran_export(context):
         elementNode = [elementNode[1], elementNode[0], elementNode[2], elementNode[3]]
       
         
-    elif elementType == '305': #Wedge
-      print('Element type not supported yet...')
+    elif elementType == '305': #Pyramid
       #the fourth 4 nodes need to be in the same plane
       #and the 5th in the direction of the right hand rule
       #see rules for hexahedron for detail
       
       #1.
-      while not findFourth(elementNode):
+      while not isPlan(elementNode[0],elementNode[1],elementNode[2],elementNode[3]):
         elementToMove = elementNode.pop(-1)
-        elementNode.insert(2, elementToMove)
-      
+        elementNode.insert(0, elementToMove)
+        print(elementNode)
       #4.
       normal = computeProdVec(pointsToVec(elementNode[0], elementNode[1]), pointsToVec(elementNode[1], elementNode[2])) #from 1 to 2, and from 2 to 3
       ref = computeDotVec(normal, pointsToVec(elementNode[0], elementNode[4]))
@@ -316,7 +341,34 @@ def Pflotran_export(context):
       
       
     elif elementType == '306': #Prism
-      print('Element type not supported yet...')
+      #algoritm rules :
+      #1. separate the 2 triangles
+      #2. check if every others points is in the same side
+      #3. arrange first triangle for right hand rule
+      #4. arrange second triangle
+      elementNode = separateTriangles(elementNode)
+      vec1 = pointsToVec(elementNode[0],elementNode[1])
+      vec2 = pointsToVec(elementNode[1],elementNode[2])
+      normal1 = computeProdVec(vec1,vec2)
+      vec3 = pointsToVec(elementNode[3],elementNode[4])
+      vec4 = pointsToVec(elementNode[4],elementNode[5])
+      normal2 = computeProdVec(vec3,vec4)
+      if computeDotVec(normal1,normal2) < 0:
+        #second triangle not in the right order
+        elementToMove = elementNode.pop(-1)
+        elementNode.insert(-2, elementToMove)
+      #check for 1254 is a plan
+      A = elementNode[0]
+      B = elementNode[1]
+      C = elementNode[4]
+      D = elementNode[3] 
+      while isPlan(A,B,C,D):
+        elementToMove = elementNode.pop(-1)
+        elementNode.insert(3, elementToMove)
+        A = elementNode[0]
+        B = elementNode[1]
+        C = elementNode[4]
+        D = elementNode[3]
     
       
     elif elementType == '308': #hexahedron
@@ -344,16 +396,13 @@ def Pflotran_export(context):
           elementNode.insert(2, elementToMove)
           #repeat 1.
           findFourth(elementNode)
-      
       #3. already done in the findFourth function
-      
       #4.
       if ref < 0:
         elementToMove = elementNode.pop(3)
         elementNode.insert(1, elementToMove)
         elementToMove = elementNode.pop(2)
         elementNode.insert(3, elementToMove)
-      
       #5.
       #recall convention of #2
       normal = computeProdVec(pointsToVec(elementNode[0], elementNode[1]), pointsToVec(elementNode[1], elementNode[2])) #recalculate normal if change
@@ -364,7 +413,6 @@ def Pflotran_export(context):
         elementNode.insert(5, elementToMove)
         elementToMove = elementNode.pop(6)
         elementNode.insert(7, elementToMove)
-      
       #6.
       A = elementNode[0]
       B = elementNode[4]
