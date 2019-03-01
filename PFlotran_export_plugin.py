@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Author : Moise Rousseau (2019)
@@ -21,11 +21,11 @@
 
 
 #TODO
-# Test PFLOTRAN with case test
 # Check HDF5 input
+# how to import h5py on salome
 # add region
 # dialog box for path / ascii / region
-# 2D/3D automatic recognition
+# 2D/3D automatic recognition -> need to complete function is3dMesh
 
 
 
@@ -54,9 +54,16 @@ def Pflotran_export(context):
     for i in range(0,len(l)-1):
       path = path + l[i] + '/'
     return path
+    
+  
+  def is3dMesh(salomeInput):
+  
+    return True
 
 
-  def meshSalomeToPFlotranAscii(salomeInput, PFlotranOutput, Mesh3D=True):
+  def meshSalomeToPFlotranAscii(salomeInput, PFlotranOutput):
+  
+    Mesh3D = is3dMesh(salomeInput)
     
     #open salome and pflotran file
     src = open(salomeInput, 'r')
@@ -65,8 +72,7 @@ def Pflotran_export(context):
     #read salome input first line
     line = src.readline().split(' ')
     n_node = int(line[0])
-    n_element_tot = int(line[1])
-    n_element_write = n_element_tot
+    n_element_write = int(line[1])
     
     #save node coordinate for verifing right hand rule
     #initiate list
@@ -85,7 +91,7 @@ def Pflotran_export(context):
     else:
       elementCode = {'203':'T', '204':'Q'}
     #Go to 2D/3D element
-    for i in range(0, n_element_tot):
+    for i in range(0, n_element_write):
       line = src.readline().split(' ')
       elementType = line[1]
       if not elementType in elementCode.keys():
@@ -119,13 +125,20 @@ def Pflotran_export(context):
     
     
 
-  def meshSalomeToPFlotranHDF5(name, folder, PFlotranOutputName, i, Mesh3D=True):
-    import h5py
+  def meshSalomeToPFlotranHDF5(salomeInput, PFlotranOutput):
+    try:
+      import h5py
+    except:
+      print('\n\nError : h5py module not installed...\n')
+      print('Need to be discover\n')
+      return None
     import gc
     
+    Mesh3D = is3dMesh(salomeInput)
+    
     #open salome and pflotran files
-    src = open(folder+'DAT_raw_mesh/'+name+'.dat', 'r')
-    out = h5py.File(PFlotranOutputName,mode='w')
+    src = open(salomeInput, 'r')
+    out = h5py.File(PFlotranOutput, mode='w')
     
     #read salome input first line
     line = src.readline().split(' ')
@@ -191,6 +204,10 @@ def Pflotran_export(context):
     del vertexArray, X, Y, Z
     gc.collect()
     
+    return idCorrespondance
+    
+  
+  def exportSubmeshAsRegion(submeshList):    
     #Region id
     if i > 1:
     #TODO
@@ -356,13 +373,13 @@ def Pflotran_export(context):
       if computeDotVec(normal1,normal2) < 0:
         #second triangle not in the right order
         elementToMove = elementNode.pop(-1)
-        elementNode.insert(-2, elementToMove)
+        elementNode.insert(-1, elementToMove)
       #check for 1254 is a plan
       A = elementNode[0]
       B = elementNode[1]
       C = elementNode[4]
       D = elementNode[3] 
-      while isPlan(A,B,C,D):
+      while not isPlan(A,B,C,D):
         elementToMove = elementNode.pop(-1)
         elementNode.insert(3, elementToMove)
         A = elementNode[0]
@@ -418,7 +435,7 @@ def Pflotran_export(context):
       B = elementNode[4]
       C = elementNode[5]
       D = elementNode[1] 
-      while isPlan(A,B,C,D):
+      while not isPlan(A,B,C,D):
         elementToMove = elementNode.pop(-1)
         elementNode.insert(4, elementToMove)
         A = elementNode[0]
@@ -479,14 +496,14 @@ def Pflotran_export(context):
 
 
   #Convertion to Pflotran
-  asciiOut = True
-  hdf5Out = False
+  asciiOut = False
+  hdf5Out = True
   if asciiOut:
     meshSalomeToPFlotranAscii(activeFolder+'DAT_raw_mesh/'+name+'.dat', activeFolder+name+'.mesh')
     if i > 1:
       print("Warning ! Ascii output not compatible with region assigning, please consider HDF5 output.\n")
   if hdf5Out:
-    meshSalomeToPFlotranHDF5(activeFolder+'DAT_raw_mesh/'+name+'.dat', activeFolder+name+'.h5', i)
+    meshSalomeToPFlotranHDF5(activeFolder+'DAT_raw_mesh/'+name+'.dat', activeFolder+name+'.h5')
     
 
   #Delete temporary files
