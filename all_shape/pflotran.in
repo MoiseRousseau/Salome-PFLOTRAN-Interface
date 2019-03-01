@@ -1,0 +1,236 @@
+#Description: Tracer test for determining the fracture and matrix porosity
+
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE RICHARDS
+   /
+    SUBSURFACE_TRANSPORT transport
+      GLOBAL_IMPLICIT
+    /
+  /
+END
+
+PROC 1 1 1
+
+
+SUBSURFACE
+#=========================== chemistry ========================================
+CHEMISTRY
+  PRIMARY_SPECIES
+    Tracer
+  /
+  OUTPUT
+    MOLARITY
+    ALL
+    FREE_ION
+  /
+END
+
+
+
+#=========================== discretization ===================================
+GRID
+  TYPE unstructured Mesh_1.mesh
+END
+
+
+
+#=========================== fluid properties =================================
+FLUID_PROPERTY
+  PHASE LIQUID
+  DIFFUSION_COEFFICIENT 5e-10
+END
+
+
+#=========================== material properties ==============================
+MATERIAL_PROPERTY soil1
+  ID 1
+  POROSITY 0.095
+  TORTUOSITY 0.1
+  SATURATION_FUNCTION default
+  PERMEABILITY
+    ISOTROPIC
+    PERM_ISO 3e-11
+  /
+  LONGITUDINAL_DISPERSIVITY 0.09
+  TRANSVERSE_DISPERSIVITY_H 0.015
+  TRANSVERSE_DISPERSIVITY_V 0.002
+END
+
+
+#=========================== characteristic curves ============================
+CHARACTERISTIC_CURVES default
+  DEFAULT
+END
+
+
+#=========================== output options ===================================
+OUTPUT
+  FORMAT HDF5
+  MASS_BALANCE
+END
+
+
+#=========================== times ============================================
+TIME
+  STEADY_STATE
+END
+
+#REFERENCE_PRESSURE 101325.
+
+
+#=========================== solver ===========================================
+
+
+
+#=========================== regions ==========================================
+REGION all
+  COORDINATES
+    -150 150 0
+    150 150 300
+  /
+END
+
+REGION inj
+  COORDINATE 0.0 0.0 0.0
+END
+
+REGION xmin
+  CARTESIAN_BOUNDARY WEST
+END
+
+REGION xmax
+  CARTESIAN_BOUNDARY EAST
+END
+
+
+
+#=========================== flow conditions ==================================
+FLOW_CONDITION initial
+  TYPE
+    PRESSURE hydrostatic
+  /
+  DATUM 0 0 0.25
+  PRESSURE 101425.
+END
+
+FLOW_CONDITION hmax
+  TYPE
+    PRESSURE hydrostatic
+  /
+  DATUM 0 0 0.25
+  PRESSURE 101523.1 # 1 cm = 0.09809 KPa = 98.09 Pa
+END
+
+FLOW_CONDITION hmin
+  TYPE
+    PRESSURE hydrostatic
+  /
+  DATUM 0 0 0.25
+  PRESSURE 101425.
+END
+
+FLOW_CONDITION injection
+  TYPE
+    RATE MASS_RATE 
+  /
+  RATE LIST
+    TIME_UNITS s
+    DATA_UNITS kg/s
+    0. 0.15e-3 #divided by 2 because half domain
+    10. 0.
+    /
+END
+
+FLOW_CONDITION no_injection
+  TYPE
+    RATE MASS_RATE 
+  /
+  RATE 0.
+END
+
+
+
+#=========================== transport conditions =============================
+CONSTRAINT initial
+  CONCENTRATIONS
+    Tracer 1e-10 F
+  /
+/
+
+CONSTRAINT injection
+  CONCENTRATIONS
+    Tracer 3e-3 F
+  /
+/
+
+TRANSPORT_CONDITION initial
+  TYPE dirichlet
+  CONSTRAINT_LIST
+    0. initial
+  /
+END
+
+TRANSPORT_CONDITION injection
+  TYPE dirichlet
+  CONSTRAINT_LIST
+    0. injection
+    20. initial
+  /
+END
+
+TRANSPORT_CONDITION xmin
+  TYPE DIRICHLET_ZERO_GRADIENT
+  CONSTRAINT_LIST
+    0. initial
+  /
+END
+
+TRANSPORT_CONDITION xmax
+  TYPE ZERO_GRADIENT
+  CONSTRAINT_LIST
+    0. initial
+  /
+END
+
+
+
+#=========================== condition couplers ===============================
+# initial condition
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  TRANSPORT_CONDITION initial
+  REGION all
+END
+
+SOURCE_SINK injection
+  FLOW_CONDITION injection
+  TRANSPORT_CONDITION injection
+  REGION inj
+END
+
+BOUNDARY_CONDITION west
+  FLOW_CONDITION hmax
+  TRANSPORT_CONDITION xmin
+  REGION xmin
+END
+
+BOUNDARY_CONDITION east
+  FLOW_CONDITION hmin
+  TRANSPORT_CONDITION xmax
+  REGION xmax
+END
+
+
+#=========================== stratigraphy couplers ============================
+STRATA
+  REGION all
+  MATERIAL soil1
+END
+
+
+
+
+END_SUBSURFACE
