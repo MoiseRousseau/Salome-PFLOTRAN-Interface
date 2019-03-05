@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Author : Moise Rousseau (2019)
@@ -21,11 +21,12 @@
 
 
 #TODO
-# Check HDF5 input
 # how to import h5py on salome
-# add region
+# test HDF5 input
+# add RHD for 2D element
+# 2D element test
+# add region : 
 # dialog box for path / ascii / region
-# 2D/3D automatic recognition -> need to complete function is3dMesh
 
 
 
@@ -43,9 +44,6 @@ def Pflotran_export(context):
   print (" Pflotran mesh converter for Salome 9.2.0 \n")
   print ("     By Moise Rousseau (2019)     \n")
   print ("  Export Salome meshes to Pflotran  \n")
-  print ("    Add check for right hand rule \n")
-  print ("Tested only with tetrahedral meshes\n")
-  print ("and a little with Hex mesh\n")
   print ("###################################\n")
   
   def GetFolder(path):
@@ -54,78 +52,51 @@ def Pflotran_export(context):
     for i in range(0,len(l)-1):
       path = path + l[i] + '/'
     return path
-    
-  
-  def is3dMesh(salomeInput):
-  
-    return True
 
 
-  def meshSalomeToPFlotranAscii(salomeInput, PFlotranOutput):
-  
-    Mesh3D = is3dMesh(salomeInput)
-    
-    #open salome and pflotran file
-    src = open(salomeInput, 'r')
+  def meshSalomeToPFlotranAscii(mesh, PFlotranOutput):
+    from SMESH import VOLUME, FACE
+     
+    #open pflotran file
     out = open(PFlotranOutput, 'w')
-    
-    #read salome input first line
-    line = src.readline().split(' ')
-    n_node = int(line[0])
-    n_element_write = int(line[1])
-    
-    #save node coordinate for verifing right hand rule
-    #initiate list
-    X = [0.0]*n_node
-    Y = [0.0]*n_node
-    Z = [0.0]*n_node
-    for i in range(0, n_node):
-      line = src.readline().split(' ')
-      X[i] = float(line[1])
-      Y[i] = float(line[2])
-      Z[i] = float(line[3])
    
     #initiate 2D/3D element type
-    if Mesh3D:
-      elementCode = {'304':'T', '305':'P', '306':'W', '308':'H'}
+    if mesh.GetElementsByType(VOLUME):
+      elementCode = {4:'T', 5:'P', 6:'W', 8:'H'}
+      meshType = VOLUME
     else:
-      elementCode = {'203':'T', '204':'Q'}
-    #Go to 2D/3D element
-    for i in range(0, n_element_write):
-      line = src.readline().split(' ')
-      elementType = line[1]
-      if not elementType in elementCode.keys():
-        n_element_write -= 1
-        continue
-      break
-      
-    #pflotran line 1
-    out.write(str(n_element_write) + ' ' + str(n_node) + '\n')
+      elementCode = {3:'T', 4:'Q'}
+      meshType = FACE
     
+    #pflotran line 1
+    n_node = mesh.NbNodes()
+    n_element = len(mesh.GetElementsByType(meshType))
+    out.write(str(n_element) + ' ' + str(n_node) + '\n')
+
     #pflotran line 2 to n_element_2D/3D +1
-    for i in range(0, n_element_write):
-      elementType = line[1]
-      out.write(elementCode[elementType] + ' ')
-      elementNode = [int(x) for x in line[2:-1]]
+    for i in meshToExport.GetElementsByType(meshType):
+      elementNode = mesh.GetElemNodes(i)
+      out.write(elementCode[len(elementNode)] + ' ')
       
-      elementNode = checkRightHandRule(elementType, elementNode, X, Y, Z)
+      elementNode = checkRightHandRule(elementNode, mesh)
       
       for x in elementNode: #write
         out.write(str(x) + ' ')
       out.write('\n')
-      line = src.readline().split(' ')
     
     #pflotran line n_element+1 to end
     #write node coordinates
-    for i in range(0,len(X)):
-      out.write(str(X[i]) + ' ' + str(Y[i]) + ' ' + str(Z[i]) + '\n')
+    for i in range(1,n_node+1):
+      X,Y,Z = meshToExport.GetNodeXYZ(i)
+      out.write(str(X) + ' ' + str(Y) + ' ' + str(Z) + '\n')
     
-    src.close()
     out.close()
     
     
 
-  def meshSalomeToPFlotranHDF5(salomeInput, PFlotranOutput):
+  def meshSalomeToPFlotranHDF5(mesh, PFlotranOutput):
+    import numpy
+    from SMESH import VOLUME, FACE
     try:
       import h5py
     except:
@@ -134,100 +105,133 @@ def Pflotran_export(context):
       return None
     import gc
     
-    Mesh3D = is3dMesh(salomeInput)
-    
-    #open salome and pflotran files
-    src = open(salomeInput, 'r')
+    #open pflotran output file
     out = h5py.File(PFlotranOutput, mode='w')
     
     #read salome input first line
-    line = src.readline().split(' ')
-    n_node = int(line[0])
-    n_element = int(line[1])
-    
-    #save node coordinate for verifing right hand rule
-    #initiate list
-    X = [0.0]*n_node
-    Y = [0.0]*n_node
-    Z = [0.0]*n_node
-    for i in range(0, n_node):
-      line = src.readline().split(' ')
-      X[i] = float(line[1])
-      Y[i] = float(line[2])
-      Z[i] = float(line[3])
-   
-    #initiate 2D/3D element type
-    if Mesh3D:
-      elementCode = {'304':4, '305':5, '306':6, '308':8}
+    if mesh.GetElementsByType(VOLUME):
+      meshType = VOLUME
     else:
-      elementCode = {'203':3, '204':4}
+      meshType = FACE
     
-    #Go to 2D/3D element
-    #TODO : Make 2D/3D recognition automatic
-    while True:
-      line = src.readline().split(' ')
-      elementType = line[1]
-      if not elementType in elementCode.keys():
-        n_element -= 1
-        continue
-      break
+    n_node = mesh.NbNodes()
+    n_element = len(mesh.GetElementsByType(meshType))
       
     #initialise array
-    elementsArray = [None]*n_element
-    idCorrespondance = {key: int(0) for key in range(0,n_element)}
+    #integer length
+    int_type = 'u%' %(numpy.floor(numpy.log(n_node)/numpy.log(2)/8)+1)
+    if mesh.NbHexas():
+      elementsArray = numpy.zeros((n_elements,9), dtype=int_type)
+    elif mesh.NbPrisms():
+      elementsArray = numpy.zeros((n_elements,7), dtype=int_type)
+    elif mesh.NbPyramids():
+      elementsArray = numpy.zeros((n_elements,6), dtype=int_type)
+    elif mesh.NbTetras() or mesh.NbQuads():
+      elementsArray = numpy.zeros((n_elements,5), dtype=int_type)
+    elif mesh.NbTriangles():
+      elementsArray = numpy.zeros((n_elements,4), dtype=int_type)
     
     #hdf5 element
-    for i in range(0, n_element):
-      elementArray = []
-      idCorrespondance[i] = int(line[0])
-      elementType = line[1]
-      elementArray.append(elementCode[elementType])
-      elementNode = [int(x) for x in line[2:-1]]
-      elementNode = checkRightHandRule(elementType, elementNode, X, Y, Z)
-      for x in elementNode:
-        elementArray.append(x)
-      elementsArray[i] = elementArray
-      line = src.readline().split(' ')
-      
+    count = 0
+    for i in meshToExport.GetElementsByType(meshType):
+      elementNode = mesh.GetElemNodes(i)
+      elementNode = checkRightHandRule(elementNode, mesh)
+      elementsArray[count,0] = len(elementNode)
+      for j in range(len(elementNode)):
+        elementsArray[count,j+1] = elementNode[j]
+      count += 1
+
     out.create_dataset('Domain/Cells', data=elementsArray)
-    del elementsArray, elementArray, elementNode, x, line #desallocate
+    del elementsArray
     gc.collect()
-    src.close()
     
     #hdf5 node coordinates
-    vertexArray = [[float(0)]*3]*n_node
+    vertexArray = numpy.zeros((n_node, 3), 'f8')
     for i in range(n_node):
-      vextexArray[i][0] = X[i]
-      vextexArray[i][1] = Y[i]
-      vextexArray[i][2] = Z[i]
+      X,Y,Z = meshToExport.GetNodeXYZ(i)
+      vextexArray[i,0] = X
+      vextexArray[i,1] = Y
+      vextexArray[i,2] = Z
     out.create_dataset('Domain/Vertices', data=vertexArray)
-    del vertexArray, X, Y, Z
+    del vertexArray
     gc.collect()
     
-    return idCorrespondance
+    return
     
   
-  def exportSubmeshAsRegion(submeshList):    
-    #Region id
-    if i > 1:
-    #TODO
-      region_group = out.create_group("Regions")
+  def SubmeshAsRegion(submesh, PFlotranOutput, name=None):
+    from SMESH import VOLUME, FACE, EDGE
+    import numpy as np
+    #region name
+    if not name:
+      name = salome.smesh.smeshBuilder.GetName(submesh)
+      
+    if submesh.GetFather().GetElementsByType(VOLUME):
+      fatherMeshType = VOLUME
+    else:
+      fatherMeshType = FACE
+      
+    #open pflotran file
+    f = h5py.File(PFlotranOutput, 'r')
+    
+    #create region folder
+    try:
+      region_group = out['Regions']
+    except:
+      region_group = out.create_group('Regions')
+    
+    #initiate 2D/3D region element type
+    n_node = submesh.GetNumberOfNodes(1)
+    n_element = submesh.GetNumberOfElements()
+    int_type = 'u%' %(numpy.floor(numpy.log(n_node)/numpy.log(2)/8)+1)
+    
+    if submesh.GetTypes() == VOLUME:
+      #father is a VOLUME mesh
+      elementList = np.array(n_element, dtype=int_type)
+      
+    elif submesh.GetTypes() == FACE:
+      #father could be VOLUME or FACE mesh
+      if fatherMeshType == FACE:
+        elementList = np.array(n_element, dtype=int_type)
+      #TODO here
+      elif fatherMeshType == VOLUME:
+        if submesh.GetMesh().NbQuads():
+          elementsArray = np.zeros((n_elements,5), dtype=int_type)
+        elif submesh.GetMesh().NbTriangles():
+          elementsArray = np.zeros((n_elements,4), dtype=int_type)
+      else:
+        print('Impossible ...')
+    
+    else:
+      #2D father and 1D element
+      n_element = len(submesh.GetMesh().GetElementsByType(EDGE))
+      elementsArray = np.zeros((n_elements,3), dtype=int_type)
+      
+      
+    if submesh.GetMesh().GetElementsByType(VOLUME):
+      lowerOrderElement = submesh.GetFather().NbElements()
+      lowerOrderElement -= submesh.GetFather().GetElementsByType(VOLUME)
+      for i in range()
+    elif:
+      
+    
 
     return
 
 
 
-  def checkRightHandRule(elementType, elementNode, X, Y, Z):
+  def checkRightHandRule(elementNode, mesh):
     """
     right hand rule organize and check
     """
-    #print(elementNode)
     
     def pointsToVec(A,B):
       """
       Create a vector AB by giving node number (A,B)
       """
-      vec = (X[B-1]-X[A-1], Y[B-1]-Y[A-1], Z[B-1]-Z[A-1])
+      X_A,Y_A,Z_A = mesh.GetNodeXYZ(A)
+      X_B,Y_B,Z_B = mesh.GetNodeXYZ(B)
+      vec = (X_B-X_A, Y_B-Y_A, Z_B-Z_A)
       return vec
       
     def computeProdVec(vecX,vecY):
@@ -323,7 +327,7 @@ def Pflotran_export(context):
                 return tri
       
     
-    if elementType == '304': #tetrahedron
+    if len(elementNode) == 4: #tetrahedron
       #method : compute normal and dot product
       #and if over the plane (>0) it's ok
       vecX = pointsToVec(elementNode[0], elementNode[1])
@@ -337,7 +341,7 @@ def Pflotran_export(context):
         elementNode = [elementNode[1], elementNode[0], elementNode[2], elementNode[3]]
       
         
-    elif elementType == '305': #Pyramid
+    elif len(elementNode) == 5: #Pyramid
       #the fourth 4 nodes need to be in the same plane
       #and the 5th in the direction of the right hand rule
       #see rules for hexahedron for detail
@@ -357,7 +361,7 @@ def Pflotran_export(context):
         elementNode.insert(3, elementToMove)
       
       
-    elif elementType == '306': #Prism
+    elif len(elementNode) == 6: #Prism
       #algoritm rules :
       #1. separate the 2 triangles
       #2. check if every others points is in the same side
@@ -388,7 +392,7 @@ def Pflotran_export(context):
         D = elementNode[3]
     
       
-    elif elementType == '308': #hexahedron
+    elif len(elementNode) == 8: #hexahedron
       #algorithm rule :
       #1. take 3 first point and found 4th in the same plan
       #2. check if all the other point are on the same side of the plan
@@ -446,6 +450,9 @@ def Pflotran_export(context):
         
     elif elementType == '204': #Quad
       print('2D element type not supported yet...')
+
+    elif elementType == '203': #Tri
+      print('2D element type not supported yet...')
         
     else:
       print('Element type not supported by PFLOTRAN...')
@@ -454,15 +461,12 @@ def Pflotran_export(context):
 
 
   # get context study, studyId, salomeGui
-  #activeStudy = context.study
   activeStudy = salome.myStudy
 
   #create folder for exportation
   activeFolder = activeStudy._get_URL()
   activeFolder = GetFolder(activeFolder)
   print ("Mesh to be save in the folder " + activeFolder)
-  if not os.path.exists(activeFolder+'DAT_raw_mesh/'):
-    os.makedirs(activeFolder+'DAT_raw_mesh/')
 
   #retrieve selected meshes
   exportSubmeshFlag = True
@@ -474,7 +478,6 @@ def Pflotran_export(context):
     print ("No submesh, only one material")
     #Export from Salome
     print ("Mesh export in progress...")
-    meshToExport.ExportDAT(activeFolder+'DAT_raw_mesh/'+name+'.dat')
     zone_assign = open(activeFolder+name+'_zone.assignment', 'w')
     zone_assign.write('%s.dat 1\n' %(name))
     zone_assign.close()
@@ -485,33 +488,24 @@ def Pflotran_export(context):
 
     #Export from Salome
     print ("Mesh export in progress...")
-    meshToExport.ExportDAT(activeFolder+'DAT_raw_mesh/'+name+'.dat')
     zone_assign = open(activeFolder+name+'_region.assignment', 'w')
     for mesh in submeshToExport:
       name2 = salome.smesh.smeshBuilder.GetName(mesh)
-      meshToExport.ExportPartToDAT(mesh, activeFolder+'DAT_raw_mesh/'+name2+'.dat')
       zone_assign.write('%s.dat %s\n' %(name2,i))
       i = i+1
     zone_assign.close()
 
 
   #Convertion to Pflotran
-  asciiOut = False
-  hdf5Out = True
+  asciiOut = True
+  hdf5Out = False
   if asciiOut:
-    meshSalomeToPFlotranAscii(activeFolder+'DAT_raw_mesh/'+name+'.dat', activeFolder+name+'.mesh')
+    meshSalomeToPFlotranAscii(meshToExport, activeFolder+name+'.mesh')
     if i > 1:
       print("Warning ! Ascii output not compatible with region assigning, please consider HDF5 output.\n")
   if hdf5Out:
     meshSalomeToPFlotranHDF5(activeFolder+'DAT_raw_mesh/'+name+'.dat', activeFolder+name+'.h5')
     
-
-  #Delete temporary files
-  delete_raw_meshes = True
-  if delete_raw_meshes:
-      for x in os.listdir(activeFolder+'DAT_raw_mesh'):
-          os.remove(activeFolder+'DAT_raw_mesh/'+x)
-      os.rmdir(activeFolder+'DAT_raw_mesh')
 
   print (" END \n")
   print ("####################\n\n")
