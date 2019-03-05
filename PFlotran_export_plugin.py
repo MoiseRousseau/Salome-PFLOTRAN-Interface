@@ -21,10 +21,11 @@
 
 
 #TODO
-# check new ascii file on PFLOTRAN
-# HDF5 input
 # how to import h5py on salome
-# add region
+# test HDF5 input
+# add RHD for 2D element
+# 2D element test
+# add region : 
 # dialog box for path / ascii / region
 
 
@@ -58,20 +59,20 @@ def Pflotran_export(context):
      
     #open pflotran file
     out = open(PFlotranOutput, 'w')
-    
-    #pflotran line 1
-    n_node = mesh.NbNodes()
-    n_element = mesh.NbElements()
-    out.write(str(n_element) + ' ' + str(n_node) + '\n')
    
     #initiate 2D/3D element type
-    if meshToExport.GetElementsByType(VOLUME):
+    if mesh.GetElementsByType(VOLUME):
       elementCode = {4:'T', 5:'P', 6:'W', 8:'H'}
       meshType = VOLUME
     else:
       elementCode = {3:'T', 4:'Q'}
       meshType = FACE
     
+    #pflotran line 1
+    n_node = mesh.NbNodes()
+    n_element = len(mesh.GetElementsByType(meshType))
+    out.write(str(n_element) + ' ' + str(n_node) + '\n')
+
     #pflotran line 2 to n_element_2D/3D +1
     for i in meshToExport.GetElementsByType(meshType):
       elementNode = mesh.GetElemNodes(i)
@@ -93,7 +94,9 @@ def Pflotran_export(context):
     
     
 
-  def meshSalomeToPFlotranHDF5(salomeInput, PFlotranOutput):
+  def meshSalomeToPFlotranHDF5(mesh, PFlotranOutput):
+    import numpy
+    from SMESH import VOLUME, FACE
     try:
       import h5py
     except:
@@ -106,49 +109,112 @@ def Pflotran_export(context):
     out = h5py.File(PFlotranOutput, mode='w')
     
     #read salome input first line
+    if mesh.GetElementsByType(VOLUME):
+      meshType = VOLUME
+    else:
+      meshType = FACE
+    
     n_node = mesh.NbNodes()
-    n_element = mesh.NbElements()
+    n_element = len(mesh.GetElementsByType(meshType))
       
     #initialise array
-    elementsArray = [None]*n_element
-    idCorrespondance = {key: int(0) for key in range(0,n_element)}
+    #integer length
+    int_type = 'u%' %(numpy.floor(numpy.log(n_node)/numpy.log(2)/8)+1)
+    if mesh.NbHexas():
+      elementsArray = numpy.zeros((n_elements,9), dtype=int_type)
+    elif mesh.NbPrisms():
+      elementsArray = numpy.zeros((n_elements,7), dtype=int_type)
+    elif mesh.NbPyramids():
+      elementsArray = numpy.zeros((n_elements,6), dtype=int_type)
+    elif mesh.NbTetras() or mesh.NbQuads():
+      elementsArray = numpy.zeros((n_elements,5), dtype=int_type)
+    elif mesh.NbTriangles():
+      elementsArray = numpy.zeros((n_elements,4), dtype=int_type)
     
     #hdf5 element
-    for i in range(0, n_element):
-      elementArray = []
-      idCorrespondance[i] = int(line[0])
-      elementType = line[1]
-      elementArray.append(elementCode[elementType])
-      elementNode = [int(x) for x in line[2:-1]]
-      elementNode = checkRightHandRule(elementType, elementNode, X, Y, Z)
-      for x in elementNode:
-        elementArray.append(x)
-      elementsArray[i] = elementArray
-      line = src.readline().split(' ')
-      
+    count = 0
+    for i in meshToExport.GetElementsByType(meshType):
+      elementNode = mesh.GetElemNodes(i)
+      elementNode = checkRightHandRule(elementNode, mesh)
+      elementsArray[count,0] = len(elementNode)
+      for j in range(len(elementNode)):
+        elementsArray[count,j+1] = elementNode[j]
+      count += 1
+
     out.create_dataset('Domain/Cells', data=elementsArray)
-    del elementsArray, elementArray, elementNode, x, line #desallocate
+    del elementsArray
     gc.collect()
-    src.close()
     
     #hdf5 node coordinates
-    vertexArray = [[float(0)]*3]*n_node
+    vertexArray = numpy.zeros((n_node, 3), 'f8')
     for i in range(n_node):
-      vextexArray[i][0] = X[i]
-      vextexArray[i][1] = Y[i]
-      vextexArray[i][2] = Z[i]
+      X,Y,Z = meshToExport.GetNodeXYZ(i)
+      vextexArray[i,0] = X
+      vextexArray[i,1] = Y
+      vextexArray[i,2] = Z
     out.create_dataset('Domain/Vertices', data=vertexArray)
-    del vertexArray, X, Y, Z
+    del vertexArray
     gc.collect()
     
-    return idCorrespondance
+    return
     
   
-  def exportSubmeshAsRegion(submeshList):    
-    #Region id
-    if i > 1:
-    #TODO
-      region_group = out.create_group("Regions")
+  def SubmeshAsRegion(submesh, PFlotranOutput, name=None):
+    from SMESH import VOLUME, FACE, EDGE
+    import numpy as np
+    #region name
+    if not name:
+      name = salome.smesh.smeshBuilder.GetName(submesh)
+      
+    if submesh.GetFather().GetElementsByType(VOLUME):
+      fatherMeshType = VOLUME
+    else:
+      fatherMeshType = FACE
+      
+    #open pflotran file
+    f = h5py.File(PFlotranOutput, 'r')
+    
+    #create region folder
+    try:
+      region_group = out['Regions']
+    except:
+      region_group = out.create_group('Regions')
+    
+    #initiate 2D/3D region element type
+    n_node = submesh.GetNumberOfNodes(1)
+    n_element = submesh.GetNumberOfElements()
+    int_type = 'u%' %(numpy.floor(numpy.log(n_node)/numpy.log(2)/8)+1)
+    
+    if submesh.GetTypes() == VOLUME:
+      #father is a VOLUME mesh
+      elementList = np.array(n_element, dtype=int_type)
+      
+    elif submesh.GetTypes() == FACE:
+      #father could be VOLUME or FACE mesh
+      if fatherMeshType == FACE:
+        elementList = np.array(n_element, dtype=int_type)
+      #TODO here
+      elif fatherMeshType == VOLUME:
+        if submesh.GetMesh().NbQuads():
+          elementsArray = np.zeros((n_elements,5), dtype=int_type)
+        elif submesh.GetMesh().NbTriangles():
+          elementsArray = np.zeros((n_elements,4), dtype=int_type)
+      else:
+        print('Impossible ...')
+    
+    else:
+      #2D father and 1D element
+      n_element = len(submesh.GetMesh().GetElementsByType(EDGE))
+      elementsArray = np.zeros((n_elements,3), dtype=int_type)
+      
+      
+    if submesh.GetMesh().GetElementsByType(VOLUME):
+      lowerOrderElement = submesh.GetFather().NbElements()
+      lowerOrderElement -= submesh.GetFather().GetElementsByType(VOLUME)
+      for i in range()
+    elif:
+      
+    
 
     return
 
@@ -384,6 +450,9 @@ def Pflotran_export(context):
         
     elif elementType == '204': #Quad
       print('2D element type not supported yet...')
+
+    elif elementType == '203': #Tri
+      print('2D element type not supported yet...')
         
     else:
       print('Element type not supported by PFLOTRAN...')
@@ -392,7 +461,6 @@ def Pflotran_export(context):
 
 
   # get context study, studyId, salomeGui
-  #activeStudy = context.study
   activeStudy = salome.myStudy
 
   #create folder for exportation
