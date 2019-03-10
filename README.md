@@ -9,9 +9,9 @@ For instance, only ASCII and HDF5 monomaterial mesh export is implemented. Switc
 
 
 # Installation instruction
-To install PFLOTRANTools, follow the nest steps:
+To install PFLOTRANTools, you need to follow the next steps:
 1. Download the repository and unzip it
-2. Create a new folder nammed "PFLOTRAN_Tools" in the [SalomeRootFolder]/BINARIES-UB18.04/GUI/share/salome/plugins/gui/
+2. Create a new folder nammed "PFLOTRAN_Tools" in the "[SalomeRootFolder]/BINARIES-UB18.04/GUI/share/salome/plugins/gui/" where [SalomeRootFolder] is the folder where you unzip Salome.
 3. Copy/paste files "PFlotran_export_plugin.py" and "salome_plugin.py" in the new folder [SalomeRootFolder]/BINARIES-UB18.04/GUI/share/salome/plugins/gui/PFLOTRAN_Tools/
 4. Open the file "salome_plugin.py"
 5. Modify the last line :
@@ -21,4 +21,20 @@ by adding the path to the Salome root folder
 
 
 # How to use the HDF5 output
-PFLOTRANTools uses the h5py module to create HDF5 files for PFLOTRAN. This module is not installed by default in the Salome TUI.
+PFLOTRANTools uses the h5py module (https://www.h5py.org/) to create HDF5 files for PFLOTRAN. This module is not installed by default in the Salome TUI. To install the module h5py, you need to follow the next steps:
+1. Download the following package:
+1.1. Pip wheel installator (https://pypi.org/project/pip/) - for example, the "pip-19.0.3-py2.py3-none-any.whl"
+1.2. pkgconfig wheel installator (https://pypi.org/project/pkgconfig/) - for example, the "pkgconfig-1.4.0-py2.py3-none-any.whl" file
+1.3. h5py source (https://pypi.org/project/h5py/) - for example, the "h5py-2.9.0.tar.gz" file
+
+2. Copy these files in the "[SalomeRootFolder]/BINARIES-UB18.04/" folder and open a terminal in this folder
+3. Make sure you have an C++ compiler installed, such as gcc (https://gcc.gnu.org/). If not, install it (or update it) with the command:
+sudo apt-get install gcc
+4. Make a symbolic link for gcc to found the Salome Python installation directory with:
+sudo ln -s [SalomeRootFolder]/BINARIES-UB18.04/Python/lib/libpython3.5.so /usr/lib/libpython3.5.so
+5. Setup the Salome environment with the command: ./../salome context
+6. Install the pkgconfig module with the following command (depending of pkgconfig version you downloaded):
+python pip-10.0.1-py2.py3-none-any.whl/pip install pkgconfig-1.4.0-py2.py3-none-any.whl 
+7. Install the h5py module with the command: 
+python pip-10.0.1-py2.py3-none-any.whl/pip install h5py-2.9.0.tar.gz
+8. h5py is now installed. You can test it by launching Salome and typping the following command in the TUI: "import h5py". This command should not return an error.
