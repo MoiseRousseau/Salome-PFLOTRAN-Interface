@@ -101,7 +101,7 @@ def Pflotran_export(context):
       import h5py
     except:
       print('\n\nError : h5py module not installed...\n')
-      print('Need to be discover\n')
+      print('Follow the procedure at ...\n')
       return None
     import gc
     
@@ -115,11 +115,16 @@ def Pflotran_export(context):
       meshType = FACE
     
     n_node = mesh.NbNodes()
-    n_element = len(mesh.GetElementsByType(meshType))
+    n_elements = len(mesh.GetElementsByType(meshType))
       
     #initialise array
     #integer length
-    int_type = 'u%' %(numpy.floor(numpy.log(n_node)/numpy.log(2)/8)+1)
+    int_type = numpy.log(n_node)/numpy.log(2)/8
+    if int_type <= 1: int_type = 'u1'
+    elif int_type <= 2: int_type = 'u2'
+    elif int_type <= 4: int_type = 'u4'
+    else: int_type = 'u8'
+    
     if mesh.NbHexas():
       elementsArray = numpy.zeros((n_elements,9), dtype=int_type)
     elif mesh.NbPrisms():
@@ -145,13 +150,14 @@ def Pflotran_export(context):
     del elementsArray
     gc.collect()
     
+    
     #hdf5 node coordinates
-    vertexArray = numpy.zeros((n_node, 3), 'f8')
-    for i in range(n_node):
-      X,Y,Z = meshToExport.GetNodeXYZ(i)
-      vextexArray[i,0] = X
-      vextexArray[i,1] = Y
-      vextexArray[i,2] = Z
+    vertexArray = numpy.zeros((n_node, 3), dtype='f8')
+    for i in range(0, n_node):
+      X,Y,Z = meshToExport.GetNodeXYZ(i+1)
+      vertexArray[i,0] = X
+      vertexArray[i,1] = Y
+      vertexArray[i,2] = Z
     out.create_dataset('Domain/Vertices', data=vertexArray)
     del vertexArray
     gc.collect()
@@ -208,18 +214,20 @@ def Pflotran_export(context):
       elementsArray = np.zeros((n_elements,3), dtype=int_type)
       
       
-    if submesh.GetMesh().GetElementsByType(VOLUME):
-      lowerOrderElement = submesh.GetFather().NbElements()
-      lowerOrderElement -= submesh.GetFather().GetElementsByType(VOLUME)
-      for i in range()
-    elif:
+#    if submesh.GetMesh().GetElementsByType(VOLUME):
+#      lowerOrderElement = submesh.GetFather().NbElements()
+#      lowerOrderElement -= submesh.GetFather().GetElementsByType(VOLUME)
+#      for i in range()
+#    elif:
       
     
 
     return
 
 
+    
 
+      
   def checkRightHandRule(elementNode, mesh):
     """
     right hand rule organize and check
@@ -325,7 +333,7 @@ def Pflotran_export(context):
                 for x in tri2:
                   tri.append(x)
                 return tri
-      
+    
     
     if len(elementNode) == 4: #tetrahedron
       #method : compute normal and dot product
@@ -473,38 +481,16 @@ def Pflotran_export(context):
   print ("Retrieve selected mesh")
   meshToExport = activeStudy.FindObjectID(salome.sg.getSelected(0)).GetObject()
   name = salome.smesh.smeshBuilder.GetName(meshToExport)
-  i = 1 #material to export
-  if not len(meshToExport.GetMeshOrder()) or not exportSubmeshFlag: #only one material
-    print ("No submesh, only one material")
-    #Export from Salome
-    print ("Mesh export in progress...")
-    zone_assign = open(activeFolder+name+'_zone.assignment', 'w')
-    zone_assign.write('%s.dat 1\n' %(name))
-    zone_assign.close()
 
-  else:
-    submeshToExport = meshToExport.GetMeshOrder()[0]
-    print ("%s submeshes in the corresponding mesh" %len(submeshToExport)) 
-
-    #Export from Salome
-    print ("Mesh export in progress...")
-    zone_assign = open(activeFolder+name+'_region.assignment', 'w')
-    for mesh in submeshToExport:
-      name2 = salome.smesh.smeshBuilder.GetName(mesh)
-      zone_assign.write('%s.dat %s\n' %(name2,i))
-      i = i+1
-    zone_assign.close()
-
-
-  #Convertion to Pflotran
-  asciiOut = True
-  hdf5Out = False
+  #Export to Pflotran
+  asciiOut = False
+  hdf5Out = True
   if asciiOut:
     meshSalomeToPFlotranAscii(meshToExport, activeFolder+name+'.mesh')
     if i > 1:
       print("Warning ! Ascii output not compatible with region assigning, please consider HDF5 output.\n")
   if hdf5Out:
-    meshSalomeToPFlotranHDF5(activeFolder+'DAT_raw_mesh/'+name+'.dat', activeFolder+name+'.h5')
+    meshSalomeToPFlotranHDF5(meshToExport, activeFolder+name+'.h5')
     
 
   print (" END \n")
