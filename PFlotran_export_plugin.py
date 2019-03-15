@@ -21,12 +21,13 @@
 
 
 #TODO
-# how to import h5py on salome
-# test HDF5 input
-# add RHD for 2D element
+# 2D region ASCII not working yet
+# add RHD for 2D element -> necessary ?
 # 2D element test
-# add region : 
 # dialog box for path / ascii / region
+# parallelize code with multiprocessing ?
+
+import sys
 
 
 
@@ -93,6 +94,35 @@ def Pflotran_export(context):
     out.close()
     
     
+  def submeshAsRegionASCII(submesh, ASCIIOutput, name=None):
+    from SMESH import VOLUME, FACE
+    
+    if submesh.GetTypes()[0] == VOLUME:
+      print("3D region not supported yet for ASCII region input")
+      print("This submesh will be ignored")
+      return
+     
+    #open pflotran file
+    out = open(ASCIIOutput, 'w')
+    
+    #write number of element
+    n_element = submesh.GetNumberOfElements()
+    out.write(str(n_element)+'\n')
+    
+    #grab element node list for each element and write it
+    for x in submesh.GetElementsId():
+        NodesId = submesh.GetMesh().GetElemNodes(x)
+        if len(NodesId) == 3: out.write('T ')
+        elif len(NodesId) == 4: out.write('Q ')
+        else: sys.exit("PFLOTRAN does not support >4 nodes element type")
+        #TODO: check RHD here ??
+        for x in NodesId:
+          out.write(str(x)+' ')
+        out.write('\n')
+    out.close()
+    return
+    
+    
 
   def meshSalomeToPFlotranHDF5(mesh, PFlotranOutput):
     import numpy
@@ -102,7 +132,7 @@ def Pflotran_export(context):
     except:
       print('\n\nError : h5py module not installed...\n')
       print('Follow the procedure at ...\n')
-      return None
+      sys.exit("FAIL")
     import gc
     
     #open pflotran output file
@@ -162,70 +192,116 @@ def Pflotran_export(context):
     del vertexArray
     gc.collect()
     
+    out.close()
+    
     return
     
   
-  def SubmeshAsRegion(submesh, PFlotranOutput, name=None):
+  def submeshAsRegionHDF5(submesh, PFlotranOutput, name=None):
     from SMESH import VOLUME, FACE, EDGE
     import numpy as np
+    import h5py
     #region name
     if not name:
       name = salome.smesh.smeshBuilder.GetName(submesh)
       
-    if submesh.GetFather().GetElementsByType(VOLUME):
-      fatherMeshType = VOLUME
-    else:
-      fatherMeshType = FACE
-      
     #open pflotran file
-    f = h5py.File(PFlotranOutput, 'r')
+    out = h5py.File(PFlotranOutput, 'r+')
     
     #create region folder
     try:
-      region_group = out['Regions']
+      regionGroup = out['Regions']
     except:
-      region_group = out.create_group('Regions')
+      regionGroup = out.create_group('Regions')
+
+    #create region
+    submeshGroup = regionGroup.create_group(name)
+    #cellIds = submeshGroup.create_group('Cell Ids')
     
     #initiate 2D/3D region element type
-    n_node = submesh.GetNumberOfNodes(1)
     n_element = submesh.GetNumberOfElements()
-    int_type = 'u%' %(numpy.floor(numpy.log(n_node)/numpy.log(2)/8)+1)
+    maxElement = max(submesh.GetMesh().GetElementsId())
+    int_type = np.log(submesh.GetMesh().GetElementsByType(VOLUME).index(maxElement)+1)/np.log(2)/8
+    if int_type <= 1: int_type = 'u1'
+    elif int_type <= 2: int_type = 'u2'
+    elif int_type <= 4: int_type = 'u4'
+    else: int_type = 'u8'
     
-    if submesh.GetTypes() == VOLUME:
+    if submesh.GetTypes()[0] == VOLUME:
       #father is a VOLUME mesh
-      elementList = np.array(n_element, dtype=int_type)
+      elementList = np.zeros(n_element, dtype=int_type)
+      count = 0
+      for x in submesh.GetElementsId():
+        elementList[count] = submesh.GetMesh().GetElementsByType(VOLUME).index(x)+1
+        count += 1
+      out.create_dataset('Regions/%s/Cell Ids' %name, data=elementList)
       
-    elif submesh.GetTypes() == FACE:
-      #father could be VOLUME or FACE mesh
-      if fatherMeshType == FACE:
-        elementList = np.array(n_element, dtype=int_type)
-      #TODO here
-      elif fatherMeshType == VOLUME:
-        if submesh.GetMesh().NbQuads():
-          elementsArray = np.zeros((n_elements,5), dtype=int_type)
-        elif submesh.GetMesh().NbTriangles():
-          elementsArray = np.zeros((n_elements,4), dtype=int_type)
-      else:
-        print('Impossible ...')
+    elif submesh.GetTypes()[0] == FACE:
+      print("Caution: PFLOTRAN function for importing 2D submesh as designed here not implemented yet.")
+      print("You could export it as ASCII, which work")
+      elementList = np.zeros(n_element, dtype=int_type)
+      faceList = np.zeros(n_element, dtype='u1')
+      
+      count = 0
+      for x in submesh.GetElementsId():
+        NodesId = submesh.GetMesh().GetElemNodes(x)
+        ElementId = submesh.GetMesh().GetElementsByNodes(NodesId, VOLUME)[0]
+        pos = submesh.GetMesh().GetElementsByType(VOLUME).index(ElementId)
+        elementList[count] = pos+1
+        ElementNodes = out['Domain']['Cells'][(pos)].tolist()
+        ElementNodes.pop(0)
+        ElementNodes = [x for x in ElementNodes if x]
+        faceList[count] = detFace(NodesId, ElementNodes)+1
+        count += 1
+        
+      out.create_dataset('Regions/%s/Cell Ids' %(name), data=elementList)
+      out.create_dataset('Regions/%s/Face Ids' %(name), data=faceList)
     
     else:
-      #2D father and 1D element
-      n_element = len(submesh.GetMesh().GetElementsByType(EDGE))
-      elementsArray = np.zeros((n_elements,3), dtype=int_type)
+      #3D father and 1D element
+      #n_element = len(submesh.GetMesh().GetElementsByType(EDGE))
+      #elementsArray = np.zeros((n_elements,3), dtype=int_type)
+      print('1D element not supported. The submesh %s will be ignored' %name)
       
-      
-#    if submesh.GetMesh().GetElementsByType(VOLUME):
-#      lowerOrderElement = submesh.GetFather().NbElements()
-#      lowerOrderElement -= submesh.GetFather().GetElementsByType(VOLUME)
-#      for i in range()
-#    elif:
-      
-    
-
+    out.close()
     return
 
 
     
+  def detFace(Nodes, ElementNodes):
+    """
+    Determine the face Id in PFLOTRAN formalism
+    """
+    #sort the node first
+    Nodes.sort()
+
+    if len(ElementNodes) == 4: #Tetrahedron
+      possibleFace = ((0,1,3), (1,2,3), (0,2,3), (0,1,2))
+    
+    elif len(ElementNodes) == 5: #pyramid
+      if len(Nodes) == 4:
+        return 5
+      possibleFace = ((0,1,4), (1,2,4), (2,3,4), (0,3,4))
+    
+    elif len(ElementNodes) == 6: #prism
+      possibleFace = ((0,1,3,4), (1,2,4,5), (0,2,3,5), (0,1,2), (3,4,5))
+    
+    elif len(ElementNodes) == 8: #hexahedron
+      possibleFace = ((0,1,4,5), (1,2,5,6), (2,3,6,7), (0,3,4,7), (0,1,2,3), (4,5,6,7))
+    
+    else:
+      print("%s nodes element type not supported" %len(ElementNodes))
+    
+    for x in possibleFace:
+      testFace = [ElementNodes[i] for i in x]
+      testFace.sort()
+      if testFace == Nodes:
+        return possibleFace.index(x)
+    print(Nodes)
+    print(ElementNodes)
+    print(possibleFace)
+    print('Error occured, face not found !')
+    sys.exit("Error occured, face not found !")
 
       
   def checkRightHandRule(elementNode, mesh):
@@ -249,17 +325,24 @@ def Pflotran_export(context):
     def computeDotVec(vecX,vecY):
       dot = vecX[0]*vecY[0]+vecX[1]*vecY[1]+vecX[2]*vecY[2]
       return dot
+
+    def norm(vec):
+      from numpy import sqrt
+      normVec = sqrt(vec[0]*vec[0]+vec[1]*vec[1]+vec[2]*vec[2])
+      return normVec
       
-    def isPlan(A,B,C,D, tol = 1e-8):
+    def isPlan(A,B,C,D, tolCosAngle = 0.01):
       if A==B or A==C or A==D: return False
       if C==B or B==D or C==D: return False
       vecX = pointsToVec(A, B)
       vecY = pointsToVec(A, C)
       prodVecXY = computeProdVec(vecX, vecY)
+      prodVecXY = prodVecXY/norm(prodVecXY)
       vecZ = pointsToVec(A, D)
       prodVecXZ = computeProdVec(vecX, vecZ)
-      prodVecXYZ = [abs(x) for x in computeProdVec(prodVecXY, prodVecXZ)]
-      if sum(prodVecXYZ) < tol:
+      prodVecXZ = prodVecXZ/norm(prodVecXZ)
+      cosAngle = computeDotVec(prodVecXY, prodVecXZ)
+      if abs(cosAngle-1) < tolCosAngle:
         return True
       else:
         return False
@@ -311,10 +394,10 @@ def Pflotran_export(context):
       return True
       
     def separateTriangles(elementList):
-      for x2 in elementNode[1:]:
-        for x3 in [x for x in elementNode[1:] if x != x2]:
-          tri = [elementNode[0], x2, x3]
-          tri2 = [x for x in elementNode if not x in tri]
+      for x2 in elementList[1:]:
+        for x3 in [x for x in elementList[1:] if x != x2]:
+          tri = [elementList[0], x2, x3]
+          tri2 = [x for x in elementList if not x in tri]
           for x in tri2: #take the other
             if not isPlan(tri[0],tri[1],tri[2],x): #if not in the plan
               #separe the 2 triangles
@@ -358,7 +441,6 @@ def Pflotran_export(context):
       while not isPlan(elementNode[0],elementNode[1],elementNode[2],elementNode[3]):
         elementToMove = elementNode.pop(-1)
         elementNode.insert(0, elementToMove)
-        print(elementNode)
       #4.
       normal = computeProdVec(pointsToVec(elementNode[0], elementNode[1]), pointsToVec(elementNode[1], elementNode[2])) #from 1 to 2, and from 2 to 3
       ref = computeDotVec(normal, pointsToVec(elementNode[0], elementNode[4]))
@@ -477,23 +559,39 @@ def Pflotran_export(context):
   print ("Mesh to be save in the folder " + activeFolder)
 
   #retrieve selected meshes
-  exportSubmeshFlag = True
   print ("Retrieve selected mesh")
   meshToExport = activeStudy.FindObjectID(salome.sg.getSelected(0)).GetObject()
   name = salome.smesh.smeshBuilder.GetName(meshToExport)
+  submeshToExport = meshToExport.GetMeshOrder()[0]
+  print ("%s submeshes in the corresponding mesh" %len(submeshToExport)) 
 
   #Export to Pflotran
+  exportSubmeshFlag = False
   asciiOut = False
   hdf5Out = True
+  print("Running mesh exportation")
   if asciiOut:
     meshSalomeToPFlotranAscii(meshToExport, activeFolder+name+'.mesh')
-    if i > 1:
-      print("Warning ! Ascii output not compatible with region assigning, please consider HDF5 output.\n")
   if hdf5Out:
     meshSalomeToPFlotranHDF5(meshToExport, activeFolder+name+'.h5')
+  print("Mesh exporation successful, go to submeshes now")
     
-
-  print (" END \n")
+  if len(submeshToExport) and exportSubmeshFlag:
+    if asciiOut:
+      print("Warning ! Ascii output not compatible with 3D region assigning, please consider HDF5 output.\n")
+      for submesh in submeshToExport:
+        submeshName = salome.smesh.smeshBuilder.GetName(submesh)
+        print("  Exporting submesh %s to ASCII file: %s" %(submeshName, submeshName+'.ss'))
+        submeshAsRegionASCII(submesh, activeFolder+submeshName+'.ss', submeshName)
+    if hdf5Out:
+      for submesh in submeshToExport:
+        submeshName = salome.smesh.smeshBuilder.GetName(submesh)
+        print("  Exporting submesh to .h5 file: %s" %submeshName)
+        submeshAsRegionHDF5(submesh, activeFolder+name+'.h5', submeshName)
+  else: 
+    print("You choose not to export submeshes")
+    
+  print ("    END \n")
   print ("####################\n\n")
 
   return
