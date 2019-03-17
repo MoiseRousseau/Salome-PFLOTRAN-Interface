@@ -22,6 +22,8 @@
 
 #TODO
 # 2D region ASCII not working yet
+# 3D quad not working with transport
+# make test pour each element for Lange test (2003)
 # add RHD for 2D element -> necessary ?
 # 2D element test
 # dialog box for path / ascii / region
