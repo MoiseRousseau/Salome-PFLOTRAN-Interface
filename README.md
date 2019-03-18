@@ -39,5 +39,5 @@ sudo ln -s [SalomeRootFolder]/BINARIES-UB18.04/Python/lib/libpython3.5.so /usr/l
 6. Install the pkgconfig module with the following command (depending of pkgconfig version you downloaded):
 python pip-19.0.3-py2.py3-none-any.whl/pip install pkgconfig-1.4.0-py2.py3-none-any.whl 
 7. Install the h5py module with the command: 
-python pip-10.0.1-py2.py3-none-any.whl/pip install h5py-2.9.0.tar.gz
+python pip-19.0.3-py2.py3-none-any.whl/pip install h5py-2.9.0.tar.gz
 8. h5py is now installed. You can test it by launching Salome and typping the following command in the TUI: "import h5py". This command should not return an error.
