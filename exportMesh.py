@@ -46,9 +46,8 @@ def computeDotVec(vecX,vecY):
   return dot      
   
 def nonConvex(elementList,mesh):
-  #dont forget all 4 points in the plan
-   #TODO
-   #redefine
+  #we make hypothese that saome doesnt create self intersecting object
+  #if not, to be completed
   return elementList
   
 
@@ -78,7 +77,7 @@ def meshToPFLOTRANUntructuredASCII(mesh, PFlotranOutput):
     elementNode = mesh.GetElemNodes(i)
     out.write(elementCode[len(elementNode)] + ' ')
     
-    elementNode = checkRightHandRule(elementNode, mesh)
+    elementNode = OrderNodes(elementNode, mesh)
     
     for x in elementNode: #write
       out.write(str(x) + ' ')
@@ -91,19 +90,19 @@ def meshToPFLOTRANUntructuredASCII(mesh, PFlotranOutput):
     out.write(str(X) + ' ' + str(Y) + ' ' + str(Z) + '\n')
   
   out.close()
-
+  return
     
     
 
 def meshToPFLOTRANUnstructuredHDF5(mesh, PFlotranOutput):
+  import time
+  tt = time.time()
   import numpy
   from SMESH import VOLUME, FACE
   try:
     import h5py
   except:
-    print('\n\nError : h5py module not installed...\n')
-    print('Follow the procedure at ...\n')
-    sys.exit("FAIL")
+    sys.exit("ERROR: h5py module not installed")
   import gc
   
   #open pflotran output file
@@ -139,9 +138,8 @@ def meshToPFLOTRANUnstructuredHDF5(mesh, PFlotranOutput):
   
   #hdf5 element
   count = 0
-  for i in meshToExport.GetElementsByType(meshType):
-    elementNode = mesh.GetElemNodes(i)
-    elementNode = checkRightHandRule(elementNode, mesh)
+  for i in mesh.GetElementsByType(meshType):
+    elementNode = OrderNodes(i, mesh)
     elementsArray[count,0] = len(elementNode)
     for j in range(len(elementNode)):
       elementsArray[count,j+1] = elementNode[j]
@@ -155,7 +153,7 @@ def meshToPFLOTRANUnstructuredHDF5(mesh, PFlotranOutput):
   #hdf5 node coordinates
   vertexArray = numpy.zeros((n_node, 3), dtype='f8')
   for i in range(0, n_node):
-    X,Y,Z = meshToExport.GetNodeXYZ(i+1)
+    X,Y,Z = mesh.GetNodeXYZ(i+1)
     vertexArray[i,0] = X
     vertexArray[i,1] = Y
     vertexArray[i,2] = Z
@@ -164,22 +162,25 @@ def meshToPFLOTRANUnstructuredHDF5(mesh, PFlotranOutput):
   gc.collect()
   
   out.close()
-  
+  print(time.time()-tt)
   return
 
 
 
-def checkRightHandRule(elementNumber, mesh):
+def OrderNodes(elementNumber, mesh):
   """
   right hand rule organize and check
   """
   from SMESH import Geom_QUADRANGLE
+
+  elementNode = mesh.GetElemNodes(elementNumber)
   
   if len(elementNode) == 3: #Tri
-    print('2D element type not supported yet...')
+    sys.exit('2D element type not supported yet...')
 
 
   elif mesh.GetElementShape(elementNumber) == Geom_QUADRANGLE: #Quad
+    sys.exit('2D element type not supported yet...')
     elementNode = nonConvex(elementNode,mesh)
 
   
@@ -207,8 +208,7 @@ def checkRightHandRule(elementNumber, mesh):
       base = mesh.GetElemFaceNodes(elementNumber, faceId)
       if len(base) == 4:
         break
-    #base =  nonConvex(base,mesh)
-    #we make hypothese that saome doesnt create self intersecting object
+    base =  nonConvex(base,mesh)
     lastNode = [x for x in elementNode if x not in base]
     elementNode = base + lastNode
     #4.
@@ -220,8 +220,39 @@ def checkRightHandRule(elementNumber, mesh):
       elementToMove = elementNode.pop(2)
       elementNode.insert(3, elementToMove)
     
-    
   elif len(elementNode) == 6: #Prism
+    #algoritm rules :
+    #1. identify quads
+    #2. get segments between triangles
+    #3. assure RHD point out second triangle
+    quads = []
+    for faceId in range(5):
+      nodes = mesh.GetElemFaceNodes(elementNumber, faceId)
+      if len(nodes) == 4:
+        quads += [nodes]
+        if len(quads) == 3:
+          break
+  
+    #here we get aligned nodes
+    segments = [[x for x in quads[0] if x in quads[1]]]
+    segments.append([x for x in quads[1] if x in quads[2]])
+    segments.append([x for x in quads[2] if x in quads[0]])
+  
+    #construct output
+    for i in range(3):
+      elementNode[i] = segments[i][0]
+      elementNode[i+3] = segments[i][1]
+    
+    #and ensure RHD
+    vec1 = pointsToVec(elementNode[0],elementNode[1],mesh)
+    vec2 = pointsToVec(elementNode[1],elementNode[2],mesh)
+    normal1 = computeProdVec(vec1,vec2)
+    if computeDotVec(normal1,pointsToVec(elementNode[0],elementNode[3],mesh)) < 0:
+      #RHD not respected: invert triangle
+      elementNode = elementNode[3:] + elementNode[0:3]  
+  
+  
+  elif len(elementNode) == -6: #Prism
     #algoritm rules :
     #1. separate the 2 triangles
     #2. check if right
@@ -272,8 +303,51 @@ def checkRightHandRule(elementNumber, mesh):
       planTest = [A,B,C,D]
       planTest.sort()
   
-    
+  
   elif len(elementNode) == 8: #hexahedron
+    #algoritm rules :
+    #1. take a quad and isole other node
+    #2. get other quads
+    #2. get segments between the two quads of 1
+    #3. assure RHD point out second quad
+    
+    #1.
+    base = mesh.GetElemFaceNodes(elementNumber, 0)
+    base = nonConvex(base, mesh)
+    top = [x for x in elementNode if x not in base]
+    top.sort()
+    
+    #2.
+    quads = []
+    for faceId in range(5):
+      quad = mesh.GetElemFaceNodes(elementNumber, faceId+1)
+      if quad.sort() != top:
+        quads.append(quad)
+    
+    #3
+    segments = []
+    for chosenQuad in range(4):
+      for otherQuad in range(3):
+        seg = [x for x in quads[otherQuad] if x in quads[chosenQuad]] #intersection quad
+        if seg not in segments:
+          segments.append(seg)
+          if len(segments) == 4:
+            break
+      if len(segments) == 4:
+            break
+            
+    #4.
+    #construct output
+    for i in range(4):
+      elementNode[i] = segments[i][0]
+      elementNode[i+4] = segments[i][1]
+    normal = computeProdVec(pointsToVec(elementNode[0], elementNode[1],mesh), pointsToVec(elementNode[1], elementNode[2],mesh)) #from 1 to 2, and from 2 to 3
+    ref = computeDotVec(normal, pointsToVec(elementNode[0], elementNode[4],mesh))
+    if ref < 0:
+      elementNode = elementNode[4:] + elementNode[:4]
+
+    
+  elif len(elementNode) == -8: #hexahedron
     #algorithm rule :
     #4. Check if normal point in the direction of other points
     #5. Make other turn for left hand rule x,y,z,a
@@ -281,8 +355,8 @@ def checkRightHandRule(elementNumber, mesh):
     #6bis. if not, turn xyza
           
     #1.
-    print(elementNode)
-    base = mesh.GetElemFaceNodes(elementNumber, 1)
+    #print(elementNode)
+    base = mesh.GetElemFaceNodes(elementNumber, 0)
     base = nonConvex(base,mesh)
     normal = computeProdVec(pointsToVec(elementNode[0], elementNode[1],mesh), pointsToVec(elementNode[1], elementNode[2],mesh)) #from 1 to 2, and from 2 to 3
     ref = computeDotVec(normal, pointsToVec(elementNode[0], elementNode[4],mesh))

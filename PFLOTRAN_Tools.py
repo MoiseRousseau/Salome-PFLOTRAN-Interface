@@ -67,8 +67,8 @@ def PFLOTRANMeshExport(context):
 
 
   #Export to Pflotran
-  exportSubmeshFlag = True
-  unstructuredExplicit = True
+  exportSubmeshFlag = False
+  unstructuredExplicit = False
   asciiOut = False
   hdf5Out = True
   print("Running mesh exportation")
