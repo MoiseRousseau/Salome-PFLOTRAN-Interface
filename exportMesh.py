@@ -226,22 +226,32 @@ def OrderNodes(elementNumber, mesh):
     #2. get segments between triangles
     #3. assure RHD point out second triangle
     quads = []
+    tri = None
     for faceId in range(5):
       nodes = mesh.GetElemFaceNodes(elementNumber, faceId)
       if len(nodes) == 4:
         quads += [nodes]
-        if len(quads) == 3:
-          break
+      if len(nodes) == 3 and not tri:
+        tri = nodes
+      if len(quads) == 3 and tri:
+        break
   
     #here we get aligned nodes
+    corresNodes = {node:-1 for node in tri}
     segments = [[x for x in quads[0] if x in quads[1]]]
     segments.append([x for x in quads[1] if x in quads[2]])
     segments.append([x for x in quads[2] if x in quads[0]])
+    for seg in segments:
+      if seg[0] in corresNodes.keys():
+        corresNodes[seg[0]] = seg[1]
+      else:
+        corresNodes[seg[1]] = seg[0]
   
     #construct output
+    #need to know which node is up or down to order it
     for i in range(3):
-      elementNode[i] = segments[i][0]
-      elementNode[i+3] = segments[i][1]
+      elementNode[i] = tri[i]
+      elementNode[i+3] = corresNodes[tri[i]]
     
     #and ensure RHD
     vec1 = pointsToVec(elementNode[0],elementNode[1],mesh)
@@ -314,14 +324,13 @@ def OrderNodes(elementNumber, mesh):
     #1.
     base = mesh.GetElemFaceNodes(elementNumber, 0)
     base = nonConvex(base, mesh)
-    top = [x for x in elementNode if x not in base]
-    top.sort()
     
     #2.
     quads = []
     for faceId in range(5):
       quad = mesh.GetElemFaceNodes(elementNumber, faceId+1)
-      if quad.sort() != top:
+      inter = [x for x in quad if x in base]
+      if inter:
         quads.append(quad)
     
     #3
@@ -329,18 +338,30 @@ def OrderNodes(elementNumber, mesh):
     for chosenQuad in range(4):
       for otherQuad in range(3):
         seg = [x for x in quads[otherQuad] if x in quads[chosenQuad]] #intersection quad
-        if seg not in segments:
+        seg.sort()
+        if seg not in segments and len(seg) == 2:
           segments.append(seg)
           if len(segments) == 4:
             break
       if len(segments) == 4:
             break
+    
+    corresNodes = {node:-1 for node in base}
+    #print(segments)
+    #print(base)
+    for seg in segments:
+      if seg[0] in corresNodes.keys():
+        corresNodes[seg[0]] = seg[1]
+      else:
+        corresNodes[seg[1]] = seg[0]
+    #print(corresNodes)
             
     #4.
     #construct output
     for i in range(4):
-      elementNode[i] = segments[i][0]
-      elementNode[i+4] = segments[i][1]
+      elementNode[i] = base[i]
+      elementNode[i+4] = corresNodes[base[i]]
+    #print(elementNode)
     normal = computeProdVec(pointsToVec(elementNode[0], elementNode[1],mesh), pointsToVec(elementNode[1], elementNode[2],mesh)) #from 1 to 2, and from 2 to 3
     ref = computeDotVec(normal, pointsToVec(elementNode[0], elementNode[4],mesh))
     if ref < 0:
