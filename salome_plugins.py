@@ -1,5 +1,4 @@
 # -*- coding: iso-8859-1 -*-
-# Copyright (C) 2010-2016  CEA/DEN, EDF R&D, OPEN CASCADE
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -17,7 +16,7 @@
 #
 # See http://www.salome-platform.org/
 #
-# Author : Moise Rousseau (2018), email at moise.rousseau@polymtl.ca
+# Author : Moise Rousseau (2019), email at moise.rousseau@polymtl.ca
 
 import salome_pluginsmanager
 
@@ -37,4 +36,9 @@ if ACTIVATE_PLUGIN:
     ACTIVATE_PLUGIN = False
 
 if ACTIVATE_PLUGIN:
-  exec(open('/home/moise/Ecole/SALOME-9.2.1-UB18.04-SRC/BINARIES-UB18.04/GUI/share/salome/plugins/gui/PFLOTRAN_Tools_GUI/PFLOTRAN_Tools.py').read())
+  #load plugin
+  pluginManagerPath = 'lib/python3.5/site-packages/salome/salome_pluginsmanager.py'
+  path = repr(__file__).split(pluginManagerPath)[0]
+  path += 'share/salome/plugins/gui/Salome-PFLOTRAN-Interface-master/'
+  print(path)
+  exec(open(path[1:] + 'PFLOTRAN_Tools.py').read())

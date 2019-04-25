@@ -1,43 +1,65 @@
-# TO BE UPDATE
-Follow the template https://gist.github.com/PurpleBooth/109311bb0361f32d87a2
+# Salome PFLOTRAN Interface
 
-# PFLOTRANTools
-Interface the Salome (https://www.salome-platform.org/) preprocessor to create mesh, region and dataset for PFLOTRAN subsurface simulator (https://www.pflotran.org/)
+Interface the Salome CAD software (https://www.salome-platform.org/) with the finite volume PFLOTRAN reactive transport subsurface simulator (https://www.pflotran.org/). This interface take the form of a Python plugin in Salome software (write in Python 3) and export mesh and region created by Salome mesh module into a readable format by PFLOTRAN code. Various PFLOTRAN input format are implemented (ASCII and HDF5 file and unstructured implicit/explicit grid description). This plugin was developped to facilitate simulation of several phenomenons in complex geometries which can not be generated and/or meshed within PFLOTRAN. 
 
-To be use as a plugin for Salome
-Work with the latest Salome 9.2.1 release
-Only tested on Linux Ubuntu 18.04
+## Getting Started
 
-For instance, only ASCII and HDF5 monomaterial mesh export is implemented. Switching between ASCII and HDF5 export is controled by 2 booleans in the "PFlotran_export_plugin.py". These boolean are "asciiOut" line 503 and "hdf5out" line 504.
+This plugin was tested on the latest release of Salome (which is up to date 9.2.1) running on Ubuntu 18.04.2 LTS. Nevertheles, it should work for newer release of Salome as for the 9.2.0 and also for other platform. Note Salome swicth to Python 3 since version 9.2.0 (February 2019) and consequently, the plugin is not compatible with older version than 9.2.0.
 
+### Prerequisites
 
-# Installation instruction
-To install PFLOTRANTools, you need to follow the next steps:
-1. Download the repository and unzip it
-2. Create a new folder nammed "PFLOTRAN_Tools" in the "[SalomeRootFolder]/BINARIES-UB18.04/GUI/share/salome/plugins/gui/" where [SalomeRootFolder] is the folder where you unzip Salome.
-3. Copy/paste files "PFlotran_export_plugin.py" and "salome_plugin.py" in the new folder [SalomeRootFolder]/BINARIES-UB18.04/GUI/share/salome/plugins/gui/PFLOTRAN_Tools/
-4. Open the file "salome_plugin.py"
-5. Modify the last line :
-exec(open('[SalomeRootFolder]/BINARIES-UB18.04/GUI/share/salome/plugins/gui/PFLOTRAN_Tools//PFLOTRAN_Tools.py').read())
-by adding the path to the Salome root folder
-6. The plugin is now installed. You can check it by opening Salome and click on Tools/Plugins/PFLOTRAN Tools/Export mesh to PFLOTRAN
-
-
-# How to use the HDF5 output
-PFLOTRANTools uses the h5py module (https://www.h5py.org/) to create HDF5 files for PFLOTRAN. This module is not installed by default in the Salome TUI. To install the module h5py, you need to follow the next steps:
+The plugin should work as is for ASCII output. Yet, if you want to use the HDF5 file output (which is a better choice at my thought - faster and less hard drive space), you will need to install the h5py module within Salome. To do so, you can follow the following step:
 1. Download the following package:
-1.1. Pip wheel installator (https://pypi.org/project/pip/) - for example, the "pip-19.0.3-py2.py3-none-any.whl"
-1.2. pkgconfig wheel installator (https://pypi.org/project/pkgconfig/) - for example, the "pkgconfig-1.4.0-py2.py3-none-any.whl" file
-1.3. h5py source (https://pypi.org/project/h5py/) - for example, the "h5py-2.9.0.tar.gz" file
-
-2. Copy these files in the "[SalomeRootFolder]/BINARIES-UB18.04/" folder and open a terminal in this folder
-3. Make sure you have an C++ compiler installed, such as gcc (https://gcc.gnu.org/). If not, install it (or update it) with the command:
+* **pip wheel installator**: https://pypi.org/project/pip/ - for example, the "pip-19.1-py2.py3-none-any.whl" one
+* **pkgconfig wheel installator**: https://pypi.org/project/pkgconfig/ - for example, the "pkgconfig-1.5.1-py2.py3-none-any.whl" one
+* and finally, the **h5py source**: https://pypi.org/project/h5py/ - for example, the "h5py-2.9.0.tar.gz" archive
+2. Copy these files in the ```$SalomeRootFolder/BINARIES-UB18.04/``` folder and open a terminal in this folder (remplace ```$SalomeRootFolder``` with the path to your Salome installation)
+3. Make sure you have an C++ compiler installed, such as gcc (https://gcc.gnu.org/). If not, install it (or update it) with the command: 
+```
 sudo apt-get install gcc
-4. Make a symbolic link for gcc to found the Salome Python installation directory with:
-sudo ln -s [SalomeRootFolder]/BINARIES-UB18.04/Python/lib/libpython3.5.so /usr/lib/libpython3.5.so
-5. Setup the Salome environment with the command: ./../salome context
-6. Install the pkgconfig module with the following command (depending of pkgconfig version you downloaded):
-python pip-19.0.3-py2.py3-none-any.whl/pip install pkgconfig-1.4.0-py2.py3-none-any.whl 
+```
+4. Make a symbolic link for gcc to found the Salome Python installation directory with: 
+```
+sudo ln -s $SalomeRootFolder/BINARIES-UB18.04/Python/lib/libpython3.5.so /usr/lib/libpython3.5.so
+```
+5. Setup the Salome environment with the command: 
+```
+./../salome context
+```
+6. Install the pkgconfig module with: (the exact command may differ due to your version of pip and pkgconfig you downloaded): 
+```
+python pip-19.1-py2.py3-none-any.whl/pip install pkgconfig-1.5.1-py2.py3-none-any.whl
+```
 7. Install the h5py module with the command: 
-python pip-19.0.3-py2.py3-none-any.whl/pip install h5py-2.9.0.tar.gz
-8. h5py is now installed. You can test it by launching Salome and typping the following command in the TUI: "import h5py". This command should not return an error.
+```
+python pip-19.1-py2.py3-none-any.whl/pip install h5py-2.9.0.tar.gz
+```
+8. h5py is now installed. You can test it by launching Salome and typping the following command in the TUI: ```import h5py```. This command should not return an error.
+
+### Installing
+
+Installation of the plugin is done in two steps:
+1. Download it.
+2. Unzip it into the folder ```$SalomeRootFolder/BINARIES-UB18.04/GUI/share/salome/plugins/gui/``` where $SalomeRootFolder is the path to your Salome installation.
+2. (bis) Make sure it work by launching Salome and going in the menu ```Tool/Plugins/```. Your new PFLOTRAN export module should appear.
+
+## Running the test
+
+**to come**
+
+## Authors
+
+* **Moïse Rousseau** - *Initial work*
+
+## License
+
+This project is licensed under the GPL version 3 License - see the [LICENSE.md](LICENSE.md) file for details
+
+## Acknowledgments
+
+* Thanks to **to come**
+
+## Citation
+If your are using this plugin in the academic area and you are writing an paper, please cite this work as:
+**To come**
+
