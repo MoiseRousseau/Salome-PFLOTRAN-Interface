@@ -68,12 +68,17 @@ def submeshAsRegionASCII(submesh, ASCIIOutput, name=None):
       out.write('\n')
   out.close()
   return
-    
+   
+
+def f(mesh, i):
+  return mesh.index(mesh[i])+1
+ 
   
 def submeshAsRegionHDF5(submesh, PFlotranOutput, name=None):
-  from SMESH import VOLUME, FACE, EDGE
+  import SMESH
   import numpy as np
   import h5py
+  import time
   #region name
   if not name:
     name = salome.smesh.smeshBuilder.GetName(submesh)
@@ -92,24 +97,42 @@ def submeshAsRegionHDF5(submesh, PFlotranOutput, name=None):
   #cellIds = submeshGroup.create_group('Cell Ids')
   
   #initiate 2D/3D region element type
-  n_element = submesh.GetNumberOfElements()
-  maxElement = max(submesh.GetMesh().GetElementsId())
-  int_type = np.log(submesh.GetMesh().GetElementsByType(VOLUME).index(maxElement)+1)/np.log(2)/8
+  if isinstance(submesh,SMESH._objref_SMESH_Group):
+    iterator = iter(submesh.GetIDs())
+    elements = submesh.GetIDs()
+    n_element = len(submesh.GetIDs())
+    maxElement = max(submesh.GetIDs())
+  elif isinstance(submesh,salome.smesh.smeshBuilder.submeshProxy):
+    iterator = iter(submesh.GetElementsId())
+    elements = submesh.GetElementsId()
+    n_element = submesh.GetNumberOfElements()
+    maxElement = max(submesh.GetMesh().GetElementsId())
+
+  int_type = np.log(submesh.GetMesh().GetElementsByType(SMESH.VOLUME).index(maxElement)+1)/np.log(2)/8
   if int_type <= 1: int_type = 'u1'
   elif int_type <= 2: int_type = 'u2'
   elif int_type <= 4: int_type = 'u4'
   else: int_type = 'u8'
+
   
-  if submesh.GetTypes()[0] == VOLUME:
+  if submesh.GetTypes()[0] == SMESH.VOLUME:
+    #father is a VOLUME mesh
+    #start pool
+    tt = time.time()
     #father is a VOLUME mesh
     elementList = np.zeros(n_element, dtype=int_type)
+    fatherMeshCells = submesh.GetMesh().GetElementsByType(SMESH.VOLUME)
+    #We need correspondance between mesh element in salome and in HDF5
+    d = {fatherMeshCells[i]: i+1 for i in range(len(fatherMesh))}
     count = 0
-    for x in submesh.GetElementsId():
-      elementList[count] = submesh.GetMesh().GetElementsByType(VOLUME).index(x)+1
+    for x in iterator:
+      elementList[count] = d[x]
       count += 1
+      
     out.create_dataset('Regions/%s/Cell Ids' %name, data=elementList)
+    print(time.time() - tt)
     
-  elif submesh.GetTypes()[0] == FACE:
+  elif submesh.GetTypes()[0] == SMESH.FACE:
     print("Caution: PFLOTRAN function for importing 2D submesh as designed here not implemented yet.")
     print("You could export it as ASCII, which work")
     elementList = np.zeros(n_element, dtype=int_type)
@@ -239,5 +262,4 @@ def detFace(Nodes, ElementNodes):
   print(possibleFace)
   print('Error occured, face not found !')
   sys.exit("Error occured, face not found !")
-
 
