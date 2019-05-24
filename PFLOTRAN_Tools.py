@@ -22,12 +22,13 @@
 # dialog box for path / ascii / region
 
 
-import sys
-import exportMesh
 
 def PFLOTRANMeshExport(context):
+  import importlib
   import exportMesh
   import exportSubMesh
+  importlib.reload(exportMesh)
+  importlib.reload(exportSubMesh)
   from salome.gui import helper
   print ("\n\n\n")
   print ("##################################\n")
@@ -51,57 +52,61 @@ def PFLOTRANMeshExport(context):
   activeFolder = activeStudy._get_URL()
   activeFolder = GetFolder(activeFolder)
   print ("Mesh to be save in the folder " + activeFolder)
+  
+  #Option selection
+  outputFileFormat = 2 #1:ASCII or 2:HDF5
+  outputMeshFormat = 1 #1:Implicit or 2:Explicit
+  exportSubmesh = True
+  
+  #Export selected meshes
+  print ("Export selected mesh")
+  meshToExport = helper.getSObjectSelected()[0].GetObject()
+  name = None #for future implementation of name chosen by user
+  exportMesh.meshToPFLOTRAN(meshToExport, activeFolder, outputFileFormat, outputMeshFormat, name)
+  
+  #retrieve submesh
+  if exportSubmesh:
+    smesh = salome.smesh.smeshBuilder.New()
+    fatherMesh = smesh.Mesh(meshToExport.GetMesh())
+    submeshToExport = []
+    if fatherMesh.GetMeshOrder():
+      submeshToExport = fatherMesh.GetMeshOrder()[0]
+    for x in fatherMesh.GetGroups():
+      submeshToExport.append(x)
+    print ("%s submeshes in the corresponding mesh" %len(submeshToExport))    
 
-  #retrieve selected meshes
-  print ("Retrieve selected mesh")
-  smesh = salome.smesh.smeshBuilder.New()
-  meshToExport = smesh.Mesh(helper.getSObjectSelected()[0].GetObject())
-  name = meshToExport.GetName()
-  submeshToExport = []
-  if meshToExport.GetMeshOrder():
-    submeshToExport = meshToExport.GetMeshOrder()[0]
-  for x in meshToExport.GetGroups():
-    submeshToExport.append(x)
-  print(submeshToExport)
-  print ("%s submeshes in the corresponding mesh" %len(submeshToExport)) 
-
-
-  #Export to Pflotran
-  exportSubmeshFlag = False
-  unstructuredExplicit = False
-  asciiOut = False
-  hdf5Out = True
-  print("Running mesh exportation")
-  if unstructuredExplicit:
-    corresp = exportMesh.meshToPFLOTRANUnstructuredExplicitASCII(meshToExport, activeFolder+name+'.uge')
-    if submeshToExport and exportSubmeshFlag:
+    if submeshToExport:
       print("Running submesh exportation")
       for submesh in submeshToExport:
         submeshName = salome.smesh.smeshBuilder.GetName(submesh)
-        exportSubMesh.submeshToPFLOTRANUnstructuredExplicit(submesh, corresp, activeFolder, submeshName)
-      
+        exportSubMesh.submeshToPFLOTRAN(submesh, activeFolder, submeshName, name, outputFileFormat, outputMeshFormat)
   else:
-    if asciiOut:
-      exportMesh.meshToPFLOTRANUntructuredASCII(meshToExport, activeFolder+name+'.ugi')
-    if hdf5Out:
-      exportMesh.meshToPFLOTRANUnstructuredHDF5(meshToExport, activeFolder+name+'.h5')
-    print("Mesh exporation successful, go to submeshes now")
+    print("You choose not to export submeshes")
     
-    if submeshToExport and exportSubmeshFlag:
+  if 0:   
+   if unstructuredImplicit:
       if asciiOut:
-        print("Warning ! Ascii output not compatible with 3D region assigning, please consider HDF5 output.\n")
-        for submesh in submeshToExport:
-          submeshName = salome.smesh.smeshBuilder.GetName(submesh)
-          print("  Exporting submesh %s to ASCII file: %s" %(submeshName, submeshName+'.ss'))
-          submeshAsRegionASCII(submesh, activeFolder+submeshName+'.ss', submeshName)
+        exportMesh.meshToPFLOTRANUntructuredASCII(meshToExport, activeFolder+name+'.ugi')
       if hdf5Out:
-        for submesh in submeshToExport:
-          submeshName = salome.smesh.smeshBuilder.GetName(submesh)
-          print("  Exporting submesh to .h5 file: %s" %submeshName)
-          submeshAsRegionHDF5(submesh, activeFolder+name+'.h5', submeshName)
-    else: 
-      print("You choose not to export submeshes")
-    
+        exportMesh.meshToPFLOTRANUnstructuredHDF5(meshToExport, activeFolder+name+'.h5')
+      print("Mesh exportation successful, go to submeshes now")
+      
+      if submeshToExport and exportSubmeshFlag:
+        if asciiOut:
+          print("Warning ! Ascii output not compatible with 3D region assigning, please consider HDF5 output.\n")
+          for submesh in submeshToExport:
+            submeshName = salome.smesh.smeshBuilder.GetName(submesh)
+            print("  Exporting submesh %s to ASCII file: %s" %(submeshName, submeshName+'.ss'))
+            submeshAsRegionASCII(submesh, activeFolder+submeshName+'.ss', submeshName)
+        if hdf5Out:
+          for submesh in submeshToExport:
+            submeshName = salome.smesh.smeshBuilder.GetName(submesh)
+            if submeshName == 'GrRock_Volumes' or submeshName == 'GrPit_Volumes':
+              print("  Exporting submesh to .h5 file: %s" %submeshName)
+              exportSubMesh.submeshAsRegionHDF5(submesh, activeFolder+name+'.h5', submeshName)
+      else: 
+        print("You choose not to export submeshes")
+  
   print ("    END \n")
   print ("####################\n\n")
 

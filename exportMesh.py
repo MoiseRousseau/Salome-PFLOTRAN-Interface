@@ -21,13 +21,75 @@
 
 
 #TODO
-# 3D element not working with transport ???
 # 2D element test
 # parallelize code with multiprocessing ?
 
 import sys
 
 
+
+def meshToPFLOTRAN(meshToExport, activeFolder, outputFileFormat, outputMeshFormat, name=None):
+  import salome
+  import SMESH
+  smesh = salome.smesh.smeshBuilder.New()
+  #Get mesh input type
+  if isinstance(meshToExport,salome.smesh.smeshBuilder.meshProxy):
+    fatherMesh = smesh.Mesh(meshToExport)
+    if not name: name = fatherMesh.GetName()
+    if fatherMesh.GetElementsByType(SMESH.VOLUME):
+      meshType = SMESH.VOLUME
+    else:
+      meshType = SMESH.FACE
+    n_nodes = fatherMesh.NbNodes()
+    n_elements = len(fatherMesh.GetElementsByType(meshType))
+    nodesList = iter(range(1,n_nodes+1))
+    elementsList = iter(fatherMesh.GetElementsByType(meshType))
+    
+  elif isinstance(meshToExport,SMESH._objref_SMESH_Group):
+    if SMESH.VOLUME in meshToExport.GetTypes():
+      meshType = SMESH.VOLUME
+    elif SMESH.FACE in meshToExport.GetTypes():
+      meshType = SMESH.FACE
+    else: raise RuntimeError('1D mesh not supported')
+    fatherMesh = smesh.Mesh(meshToExport.GetMesh())
+    n_nodes = len(meshToExport.GetNodeIDs())
+    n_elements = len(meshToExport.GetIDs())
+    nodesList = iter(meshToExport.GetNodeIDs())
+    elementsList = iter(meshToExport.GetIDs())
+    if not name: name = salome.smesh.smeshBuilder.GetName(meshToExport)
+    
+  elif isinstance(meshToExport,salome.smesh.smeshBuilder.submeshProxy):
+    if meshToExport.GetElementsByType(SMESH.VOLUME):
+      meshType = SMESH.VOLUME
+    elif meshToExport.GetElementsByType(SMESH.FACE):
+      meshType = SMESH.FACE
+    else: raise RuntimeError('1D mesh not supported')
+    fatherMesh = smesh.Mesh(meshToExport.GetMesh())
+    n_nodes = meshToExport.GetNumberOfNodes(1)
+    n_elements = meshToExport.GetNumberOfElements()
+    nodesList = iter(meshToExport.GetNodesId())
+    elementsList = iter(meshToExport.GetElementsId())
+    if not name: name = salome.smesh.smeshBuilder.GetName(meshToExport)
+    
+  else:
+    raise RuntimeError('Selection is not a mesh or part of a mesh. Interruption')
+    
+  #Export it
+  PFlotranOutput = activeFolder + name
+  if outputFileFormat == 1: #ASCII
+    if outputMeshFormat == 1: #Implicit
+      meshToPFLOTRANUntructuredASCII(fatherMesh, n_nodes, n_elements, nodesList, elementsList, meshType, PFlotranOutput + '.ugi')
+    if outputMeshFormat == 2 and isinstance(fatherMesh, salome.smesh.smeshBuilder.Mesh): #Explicit
+      meshToPFLOTRANUnstructuredExplicitASCII(fatherMesh, PFlotranOutput + '.uge')
+      
+  elif outputFileFormat == 2: #HDF5
+    meshToPFLOTRANUnstructuredHDF5(meshToExport, fatherMesh, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput + '.h5')
+    
+  return
+  
+  
+  
+  
 def pointsToVec(A,B,mesh):
   """
   Create a vector AB by giving node number (A,B)
@@ -53,28 +115,24 @@ def nonConvex(elementList,mesh):
 
 
 
-def meshToPFLOTRANUntructuredASCII(mesh, PFlotranOutput):
+def meshToPFLOTRANUntructuredASCII(fatherMesh, n_nodes, n_elements, nodesList, elementsList, meshType, PFlotranOutput):
   from SMESH import VOLUME, FACE
    
   #open pflotran file
   out = open(PFlotranOutput, 'w')
  
   #initiate 2D/3D element type
-  if mesh.GetElementsByType(VOLUME):
+  if meshType == VOLUME:
     elementCode = {4:'T', 5:'P', 6:'W', 8:'H'}
-    meshType = VOLUME
   else:
     elementCode = {3:'T', 4:'Q'}
-    meshType = FACE
   
   #pflotran line 1
-  n_node = mesh.NbNodes()
-  n_element = len(mesh.GetElementsByType(meshType))
-  out.write(str(n_element) + ' ' + str(n_node) + '\n')
+  out.write(str(n_element) + ' ' + str(n_nodes) + '\n')
 
   #pflotran line 2 to n_element_2D/3D +1
-  for i in mesh.GetElementsByType(meshType):
-    elementNode = mesh.GetElemNodes(i)
+  for i in elementsList:
+    elementNode = fatherMesh.GetElemNodes(i)
     out.write(elementCode[len(elementNode)] + ' ')
     
     elementNode = OrderNodes(elementNode, mesh)
@@ -85,8 +143,8 @@ def meshToPFLOTRANUntructuredASCII(mesh, PFlotranOutput):
   
   #pflotran line n_element+1 to end
   #write node coordinates
-  for i in range(1,n_node+1):
-    X,Y,Z = meshToExport.GetNodeXYZ(i)
+  for i in nodesList:
+    X,Y,Z = fatherMesh.GetNodeXYZ(i)
     out.write(str(X) + ' ' + str(Y) + ' ' + str(Z) + '\n')
   
   out.close()
@@ -94,52 +152,43 @@ def meshToPFLOTRANUntructuredASCII(mesh, PFlotranOutput):
     
     
 
-def meshToPFLOTRANUnstructuredHDF5(mesh, PFlotranOutput):
-  import time
-  tt = time.time()
+def meshToPFLOTRANUnstructuredHDF5(meshToExport, fatherMesh, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput):
   import numpy
-  from SMESH import VOLUME, FACE
   try:
     import h5py
   except:
-    sys.exit("ERROR: h5py module not installed")
+    raise RuntimeError('h5py is not installed.')
   import gc
   
   #open pflotran output file
   out = h5py.File(PFlotranOutput, mode='w')
-  
-  #read salome input first line
-  if mesh.GetElementsByType(VOLUME):
-    meshType = VOLUME
-  else:
-    meshType = FACE
-  
-  n_node = mesh.NbNodes()
-  n_elements = len(mesh.GetElementsByType(meshType))
     
   #initialise array
   #integer length
-  int_type = numpy.log(n_node)/numpy.log(2)/8
+  int_type = numpy.log(n_nodes)/numpy.log(2)/8
   if int_type <= 1: int_type = 'u1'
   elif int_type <= 2: int_type = 'u2'
   elif int_type <= 4: int_type = 'u4'
   else: int_type = 'u8'
   
-  if mesh.NbHexas():
+  #only linear element
+  if meshToExport.GetMeshInfo()[16]: #hexa
     elementsArray = numpy.zeros((n_elements,9), dtype=int_type)
-  elif mesh.NbPrisms():
+  elif meshToExport.GetMeshInfo()[19]: #prisms
     elementsArray = numpy.zeros((n_elements,7), dtype=int_type)
-  elif mesh.NbPyramids():
+  elif meshToExport.GetMeshInfo()[14]: #pyr
     elementsArray = numpy.zeros((n_elements,6), dtype=int_type)
-  elif mesh.NbTetras() or mesh.NbQuads():
+  elif meshToExport.GetMeshInfo()[7] or meshToExport.GetMeshInfo()[12]: #quad or tetra
     elementsArray = numpy.zeros((n_elements,5), dtype=int_type)
-  elif mesh.NbTriangles():
+  elif meshToExport.GetMeshInfo()[4]: #tri
     elementsArray = numpy.zeros((n_elements,4), dtype=int_type)
+  else:
+    raise RuntimeError('No linear element of dimension superior to 2 found.')
   
   #hdf5 element
   count = 0
-  for i in mesh.GetElementsByType(meshType):
-    elementNode = OrderNodes(i, mesh)
+  for i in elementsList:
+    elementNode = OrderNodes(i, fatherMesh)
     elementsArray[count,0] = len(elementNode)
     for j in range(len(elementNode)):
       elementsArray[count,j+1] = elementNode[j]
@@ -151,18 +200,17 @@ def meshToPFLOTRANUnstructuredHDF5(mesh, PFlotranOutput):
   
   
   #hdf5 node coordinates
-  vertexArray = numpy.zeros((n_node, 3), dtype='f8')
-  for i in range(0, n_node):
-    X,Y,Z = mesh.GetNodeXYZ(i+1)
-    vertexArray[i,0] = X
-    vertexArray[i,1] = Y
-    vertexArray[i,2] = Z
+  vertexArray = numpy.zeros((n_nodes, 3), dtype='f8')
+  for i in nodesList:
+    X,Y,Z = fatherMesh.GetNodeXYZ(i)
+    vertexArray[i-1,0] = X
+    vertexArray[i-1,1] = Y
+    vertexArray[i-1,2] = Z
   out.create_dataset('Domain/Vertices', data=vertexArray)
   del vertexArray
   gc.collect()
   
   out.close()
-  print(time.time()-tt)
   return
 
 
@@ -176,11 +224,11 @@ def OrderNodes(elementNumber, mesh):
   elementNode = mesh.GetElemNodes(elementNumber)
   
   if len(elementNode) == 3: #Tri
-    sys.exit('2D element type not supported yet...')
+    raise RuntimeError('2D element type not supported yet...')
 
 
   elif mesh.GetElementShape(elementNumber) == Geom_QUADRANGLE: #Quad
-    sys.exit('2D element type not supported yet...')
+    raise RuntimeError('2D element type not supported yet...')
     elementNode = nonConvex(elementNode,mesh)
 
   
@@ -259,60 +307,7 @@ def OrderNodes(elementNumber, mesh):
     normal1 = computeProdVec(vec1,vec2)
     if computeDotVec(normal1,pointsToVec(elementNode[0],elementNode[3],mesh)) < 0:
       #RHD not respected: invert triangle
-      elementNode = elementNode[3:] + elementNode[0:3]  
-  
-  
-  elif len(elementNode) == -6: #Prism
-    #algoritm rules :
-    #1. separate the 2 triangles
-    #2. check if right
-    #3. arrange first triangle for right hand rule
-    #4. arrange second triangle
-    elementNode = []
-    for faceId in range(5):
-      tri = mesh.GetElemFaceNodes(elementNumber, faceId)
-      if len(tri) == 3:
-        elementNode += tri
-    #order 1st triangle to RHD point out 2nd triangle
-    vec1 = pointsToVec(elementNode[0],elementNode[1],mesh)
-    vec2 = pointsToVec(elementNode[1],elementNode[2],mesh)
-    normal1 = computeProdVec(vec1,vec2)
-    if computeDotVec(normal1,pointsToVec(elementNode[0],elementNode[3],mesh)) < 0:
-      elementToMove = elementNode.pop(1)
-      elementNode.insert(2, elementToMove)
-      #and recompute vec
-      vec1 = pointsToVec(elementNode[0],elementNode[1],mesh)
-      vec2 = pointsToVec(elementNode[1],elementNode[2],mesh)
-      normal1 = computeProdVec(vec1,vec2)
-    vec3 = pointsToVec(elementNode[3],elementNode[4],mesh)
-    vec4 = pointsToVec(elementNode[4],elementNode[5],mesh)
-    normal2 = computeProdVec(vec3,vec4)
-    if computeDotVec(normal1,normal2) < 0:
-      #second triangle not in the right order
-      elementToMove = elementNode.pop(-1)
-      elementNode.insert(-1, elementToMove)
-    #check for 1254 is a plan
-    #get test plan
-    A = elementNode[0]
-    B = elementNode[1]
-    C = elementNode[4]
-    D = elementNode[5]
-    for faceId in range(5):
-      planElem = mesh.GetElemFaceNodes(elementNumber, faceId)
-      planElem.sort()
-      if len(planElem) == 4:
-        if A in planElem and B in planElem:
-          break
-    planTest = [A,B,C,D]
-    planTest.sort()
-    while planElem != planTest:
-      elementToMove = elementNode.pop(-1)
-      elementNode.insert(3, elementToMove)
-      C = elementNode[5]
-      D = elementNode[4]
-      planTest = [A,B,C,D]
-      planTest.sort()
-  
+      elementNode = elementNode[3:] + elementNode[0:3]    
   
   elif len(elementNode) == 8: #hexahedron
     #algoritm rules :
@@ -366,63 +361,9 @@ def OrderNodes(elementNumber, mesh):
     ref = computeDotVec(normal, pointsToVec(elementNode[0], elementNode[4],mesh))
     if ref < 0:
       elementNode = elementNode[4:] + elementNode[:4]
-
-    
-  elif len(elementNode) == -8: #hexahedron
-    #algorithm rule :
-    #4. Check if normal point in the direction of other points
-    #5. Make other turn for left hand rule x,y,z,a
-    #6. 1x2y should be in the same plan
-    #6bis. if not, turn xyza
-          
-    #1.
-    #print(elementNode)
-    base = mesh.GetElemFaceNodes(elementNumber, 0)
-    base = nonConvex(base,mesh)
-    normal = computeProdVec(pointsToVec(elementNode[0], elementNode[1],mesh), pointsToVec(elementNode[1], elementNode[2],mesh)) #from 1 to 2, and from 2 to 3
-    ref = computeDotVec(normal, pointsToVec(elementNode[0], elementNode[4],mesh))
-    if ref < 0:
-      elementToMove = elementNode.pop(3)
-      elementNode.insert(1, elementToMove)
-      elementToMove = elementNode.pop(2)
-      elementNode.insert(3, elementToMove)
-    #add other points
-    top = [x for x in mesh.GetElemNodes(elementNumber) if x not in base]
-    top = nonConvex(top,mesh)
-    elementNode = base + top
-    #5.
-    #recall convention of #2
-    normal = computeProdVec(pointsToVec(elementNode[0], elementNode[1],mesh), pointsToVec(elementNode[1], elementNode[2],mesh)) #recalculate normal if change
-    #point are normally in the right order from findFourth function
-    normal2 = computeProdVec(pointsToVec(elementNode[4], elementNode[5],mesh), pointsToVec(elementNode[5], elementNode[6],mesh))
-    if computeDotVec(normal, normal2) < 0: #turn in the wrong direction
-      elementToMove = elementNode.pop(7)
-      elementNode.insert(5, elementToMove)
-      elementToMove = elementNode.pop(6)
-      elementNode.insert(7, elementToMove)
-    #6.
-    #get test plan
-    A = elementNode[0]
-    B = elementNode[1]
-    C = elementNode[4]
-    D = elementNode[5]
-    for faceId in range(8):
-      planElem = mesh.GetElemFaceNodes(elementNumber, faceId)
-      planElem.sort()
-      if A in planElem and B in planElem and elementNode[3] not in planElem:
-        break
-    planTest = [A,B,C,D]
-    planTest.sort()
-    while planElem != planTest:
-      elementToMove = elementNode.pop(-1)
-      elementNode.insert(4, elementToMove)
-      C = elementNode[4]
-      D = elementNode[5]
-      planTest = [A,B,C,D]
-      planTest.sort()
       
   else:
-    print('Element type not supported by PFLOTRAN structured implicit grid...')
+    raise RuntimeError('Element not supported by PFLOTRAN implicit grid format')
 
   return elementNode
 
@@ -521,7 +462,7 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput):
 
 
 def meshToPFLOTRANUnstructuredExplicitHDF5(mesh, PFlotranOutput):
-  sys.exit("HDF5 unstructureed explicit seems not to be implemented in PFLOTRAN")
+  raise RuntimeError('HDF5 unstructureed explicit seems not to be implemented in PFLOTRAN')
   return
 
 

@@ -37,8 +37,8 @@ if ACTIVATE_PLUGIN:
 
 if ACTIVATE_PLUGIN:
   #load plugin
-  pluginManagerPath = 'lib/python3.5/site-packages/salome/salome_pluginsmanager.py'
+  pluginManagerPath = 'lib/python3.6/site-packages/salome/salome_pluginsmanager.py'
   path = repr(__file__).split(pluginManagerPath)[0]
   path += 'share/salome/plugins/gui/Salome-PFLOTRAN-Interface-master/'
-  print(path)
   exec(open(path[1:] + 'PFLOTRAN_Tools.py').read())
+  exec(open(path[1:] + 'EDZ_Permeability_assignment.py').read())
