@@ -12,7 +12,6 @@ Interface the Salome CAD software (https://www.salome-platform.org/) with the fi
 * Export 2D submeshes in ASCII format to define boundary / initial condition (HDF5 format not implemented in PFLOTRAN yet).
 
 ## Features to come:
-* Unstructured polyhedra format
 * GUI
 * Submeshes to export selection
 * PFLOTRAN input file autocompletion
@@ -23,7 +22,7 @@ This plugin was tested on the latest release of Salome (which is up to date 9.3.
 
 ### Prerequisites
 
-The plugin should work as is for ASCII output. Yet, if you want to use the HDF5 file output (which is a better choice at my thought - faster and less hard drive space), you will need to install the h5py module within Salome. To do so, you can follow the following step:
+The plugin should work as is for ASCII output. Yet, if you want to use the HDF5 file output (which is a better choice at my thought - faster and less hard drive space), you will need to install the h5py module within Salome. Note, since version 9.3.0, Salome is built-in with the pip and h5py package, but I could not make it work. If you encounter the same difficulty, you can install it manually. To do so, you can follow the following step:
 1. Download the following package:
 * **pip wheel installator**: https://pypi.org/project/pip/ - for example, the "pip-19.1.1-py2.py3-none-any.whl" one
 * **pkgconfig wheel installator**: https://pypi.org/project/pkgconfig/ - for example, the "pkgconfig-1.5.1-py2.py3-none-any.whl" one
