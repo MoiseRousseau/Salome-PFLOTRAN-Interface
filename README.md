@@ -13,6 +13,7 @@ Interface the Salome CAD software (https://www.salome-platform.org/) with the fi
 
 ## Features to come:
 * GUI
+* Clipped Voronoi meshes
 * Submeshes to export selection
 * PFLOTRAN input file autocompletion
 
@@ -62,6 +63,11 @@ To export your mesh from Salome to PFLOTRAN:
 1. Select the mesh, submesh or group of meshes you want to export
 2. Click on `Tool/Plugins/PFLOTRAN Tools GUI/Export mesh to PFLOTRAN_GUI`
 3. Your mesh and all its submeshes will be exported in the folder where you save your Salome study.
+
+## Know limitations
+
+Free volume meshing (like tetrahedral meshes) are the most way to generate meshes minimizing the human time. However, PFLOTRAN use a finite volume discretization and require a orthogonal mesh to be accurante. This mean all the vector linking two adjacent cells need to be normal to the face between those two cells. This condition is not meet when using tetrahedral mesh and can lead to significant error in the final solution.
+A workaround that minimizing also the human time is to generate a tetrahedral mesh and after, convert it into a Voronoi diagram. This way, we ensure every faces is normal to the vector linking the two cell centers. This is ongoing work.
 
 ## Troubleshooting
 
