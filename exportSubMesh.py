@@ -32,7 +32,8 @@ def submeshToPFLOTRAN(submesh, activeFolder, submeshName, fatherMeshFile=None, o
   import SMESH
   import salome
   #Get mesh input type
-  if isinstance(submesh,SMESH._objref_SMESH_Group):
+  if (isinstance(submesh,SMESH._objref_SMESH_Group) or
+      isinstance(submesh,SMESH._objref_SMESH_GroupOnGeom)):
     elementsList = iter(submesh.GetIDs())
     n_elements = len(submesh.GetIDs())
     maxElement = max(submesh.GetIDs())

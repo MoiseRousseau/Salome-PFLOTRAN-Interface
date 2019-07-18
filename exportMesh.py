@@ -27,6 +27,16 @@
 import sys
 
 
+def progress_bar(iteration, total, barLength=50):
+  #https://gist.github.com/azlux/7b8f449ac7fa308d45232c3a281be7bb
+  percent = int(round((iteration / total) * 100))
+  nb_bar_fill = int(round((barLength * percent) / 100))
+  bar_fill = '#' * nb_bar_fill
+  bar_empty = ' ' * (barLength - nb_bar_fill)
+  sys.stdout.write("\r  [{0}] {1}%".format(str(bar_fill + bar_empty), percent))
+  sys.stdout.flush()
+  return
+
 
 def meshToPFLOTRAN(meshToExport, activeFolder, outputFileFormat, outputMeshFormat, name=None):
   import salome
@@ -187,7 +197,10 @@ def meshToPFLOTRANUnstructuredHDF5(meshToExport, fatherMesh, n_nodes, n_elements
   
   #hdf5 element
   count = 0
+  print('Creating Domain/Cells dataset:')
   for i in elementsList:
+    if not count % 100:
+      progress_bar(count, n_elements, barLength=50)
     elementNode = OrderNodes(i, fatherMesh)
     elementsArray[count,0] = len(elementNode)
     for j in range(len(elementNode)):
@@ -200,6 +213,7 @@ def meshToPFLOTRANUnstructuredHDF5(meshToExport, fatherMesh, n_nodes, n_elements
   
   
   #hdf5 node coordinates
+  print('\nCreating Domain/Vertices dataset: ')
   vertexArray = numpy.zeros((n_nodes, 3), dtype='f8')
   for i in nodesList:
     X,Y,Z = fatherMesh.GetNodeXYZ(i)
