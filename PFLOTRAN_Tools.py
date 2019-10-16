@@ -49,7 +49,6 @@ def PFLOTRANMeshExport(context):
       #sg.getObjectBrowser().selectionChanged.connect(self.select)
       self.selectMesh = False
       self.selectedMesh = None
-      self.outputFile = '~/' #home bu default
       self.selectSubmesh = False
       self.availableSubmesh = {}
       self.selectedSubmesh = []
@@ -81,6 +80,7 @@ def PFLOTRANMeshExport(context):
       
     def _selectMeshInput(self, objId):
       self.selectedMesh = salome.IDToObject(objId)
+      name = ''
       if isinstance(self.selectedMesh,salome.smesh.smeshBuilder.meshProxy):
         name = salome.smesh.smeshBuilder.GetName(self.selectedMesh)
         smesh = salome.smesh.smeshBuilder.New()
@@ -112,8 +112,7 @@ def PFLOTRANMeshExport(context):
     def setOutputFile(self):
       fd = QFileDialog(self, "Select an output name", self.ui.le_origOutputFile.text(), "PFLOTRAN HDF5 File (*.h5);;PFLOTRAN Implicit ASCII grid (*.ugi);;PFLOTRAN Explicit ASCII grid (*.uge);;All Files (*)")
       if fd.exec_():
-        self.outputFile = fd.selectedFiles()[0]
-        self.ui.le_origOutputFile.setText(self.outputFile)
+        self.ui.le_origOutputFile.setText(fd.selectedFiles()[0])
       return
       
     def enableSubmesh(self):
@@ -180,8 +179,19 @@ def PFLOTRANMeshExport(context):
     def printErrorMessage(self, text):
       import qtsalome
       msg = qtsalome.QMessageBox()
+      #msg.setTitle('Error!')
       msg.setText(text)
       msg.setIcon(QMessageBox.Critical)
+      msg.setStandardButtons(QMessageBox.Ok)
+      msg.exec_()
+      return
+      
+    def printInformationMessage(self, text):
+      import qtsalome
+      msg = qtsalome.QMessageBox()
+      #msg.setTitle('Error!')
+      msg.setText(text)
+      msg.setIcon(QMessageBox.Information)
       msg.setStandardButtons(QMessageBox.Ok)
       msg.exec_()
       return
@@ -200,9 +210,16 @@ def PFLOTRANMeshExport(context):
     print ("##########################################\n")
     
     #retrieve data from the GUI
+    #mesh to export
     meshToExport = window.selectedMesh #Mesh object
-    name = window.outputFile.split('/')[-1]
-    folder = window.outputFile[0:-len(name)]
+    #destination file
+    if window.ui.le_origOutputFile.text():
+      name = window.ui.le_origOutputFile.text().split('/')[-1]
+      folder = window.ui.le_origOutputFile.text()[0:-len(name)]
+    else:
+      window.printErrorMessage('Please provide an output file')
+      return
+    #output format
     HDF5 = 1 ; ASCII = 2
     if window.ui.rb_outputFormat[0].isChecked(): 
       try:
@@ -212,23 +229,33 @@ def PFLOTRANMeshExport(context):
         window.printErrorMessage('h5py module not installed. You should install it before to export meshes in HDF5 format.')
         return
     else: outFormat = ASCII
+    #grid format
     IMPLICIT = 1 ; EXPLICIT = 2
     if window.ui.rb_gridFormat[0].isChecked(): gridFormat = IMPLICIT
     else: gridFormat = EXPLICIT
+    #group to export
     groupsToExport = []
-    for row in range(window.ui.table_toExport.rowCount()):
-      groupNameInSalome = window.ui.table_toExport.item(row,0).text()
-      groupNameInOut = window.ui.table_toExport.item(row,1).text()
-      if window.ui.table_toExport.item(row,2).text() == 'VOLUME':
-        groupType = SMESH.VOLUME
-      elif window.ui.table_toExport.item(row,2).text() == 'FACE':
-        groupType = SMESH.FACE
-      group = meshToExport.GetGroupByName(groupNameInSalome, groupType)
-      if len(group) != 1:
-        window.printErrorMessage('Two or more groups have the same name in Salome. Please assign different group name for each group to export')
-      groupsToExport.append([group[0], groupNameInOut])
+    if window.selectSubmesh and gridFormat == EXPLICIT:
+      window.printInformationMessage('Explicit format group exportation not implemented so far. Group exportation will be ignored.')
+    else:
+      for row in range(window.ui.table_toExport.rowCount()):
+        groupNameInSalome = window.ui.table_toExport.item(row,0).text()
+        groupNameInOut = window.ui.table_toExport.item(row,1).text()
+        if window.ui.table_toExport.item(row,2).text() == 'VOLUME':
+          groupType = SMESH.VOLUME
+        elif window.ui.table_toExport.item(row,2).text() == 'FACE':
+          groupType = SMESH.FACE
+        group = meshToExport.GetGroupByName(groupNameInSalome, groupType)
+        #warning / error message
+        if len(group) != 1:
+          window.printErrorMessage('Two or more groups have the same name in Salome. Please assign different group name for each group to export')
+        if SMESH.VOLUME in group[0].GetTypes() and outFormat==ASCII:
+          window.printErrorMessage('Unable to export ' + groupNameInSalome + ' group. Volume group in ASCII output can not be read by PFLOTRAN since it is not implemented. Try to switch to HDF5 output which work')
+          continue
+        if SMESH.FACE in group[0].GetTypes() and outFormat==HDF5:
+          window.printInformationMessage('Face group in HDF5 output can not be read by PFLOTRAN since it is not implemented. %s group will be exported in ASCII under the name %s.ss' %(groupNameInSalome, groupNameInOut))
+        groupsToExport.append([group[0], groupNameInOut])
     
-      
   #Export selected meshes
   print ("Export mesh: " + meshToExport.GetName())
   exportMesh.meshToPFLOTRAN(meshToExport, folder, outFormat, gridFormat, name)
@@ -237,7 +264,8 @@ def PFLOTRANMeshExport(context):
   if groupsToExport:
     print ("%s group(s) to export: " %len(groupsToExport))    
     for (group,groupName) in groupsToExport:
-      exportSubMesh.submeshToPFLOTRAN(group, folder, groupName, name, outFormat, gridFormat)
+      print(groupName)
+      exportSubMesh.submeshToPFLOTRAN(group, groupName, folder, name, outFormat, gridFormat)
   else:
     print("There is no group to export")
   

@@ -26,7 +26,7 @@
 import sys
 
 
-def submeshToPFLOTRAN(submesh, activeFolder, submeshName, fatherMeshFile=None, outputFileFormat=0, outputMeshFormat=0):
+def submeshToPFLOTRAN(submesh, submeshName, activeFolder, meshFile=None, outputFileFormat=0, outputMeshFormat=0):
   import SMESH
   import salome
   #Get mesh input type
@@ -35,36 +35,43 @@ def submeshToPFLOTRAN(submesh, activeFolder, submeshName, fatherMeshFile=None, o
     elementsList = iter(submesh.GetIDs())
     n_elements = len(submesh.GetIDs())
     maxElement = max(submesh.GetIDs())
-  elif isinstance(submesh,salome.smesh.smeshBuilder.submeshProxy):
-    elementsList = iter(submesh.GetElementsId())
-    n_elements = submesh.GetNumberOfElements()
-    maxElement = max(submesh.GetMesh().GetElementsId())
+  #elif isinstance(submesh,salome.smesh.smeshBuilder.submeshProxy):
+  #  elementsList = iter(submesh.GetElementsId())
+  #  n_elements = submesh.GetNumberOfElements()
+  #  maxElement = max(submesh.GetMesh().GetElementsId())
     
   #submesh and father mesh type
   submeshType = submesh.GetTypes()[0]
   fatherMesh = submesh.GetMesh() #meshProxy object
   if SMESH.VOLUME in fatherMesh.GetTypes():
     fatherMeshType = SMESH.VOLUME
-  elif SMESH.FACE in fatherMesh.GetTypes():
-    fatherMeshType = SMESH.FACE
+  #elif SMESH.FACE in fatherMesh.GetTypes():
+  #  fatherMeshType = SMESH.FACE
   else:
-    raise RuntimeError('1D element or less not take into account yet')
-  
-  if not fatherMeshFile:
-    fatherMeshFile = salome.smesh.smeshBuilder.GetName(submesh)
-  pathToFatherMesh = activeFolder+'/'+salome.smesh.smeshBuilder.GetName(submesh.GetMesh())
-  
-  if submeshType == SMESH.VOLUME and fatherMeshType == SMESH.VOLUME:
-    volumeSubmeshAsRegionHDF5(submesh, elementsList, maxElement, n_elements, pathToFatherMesh+'.h5', name=None)
-  elif submeshType == SMESH.FACE and fatherMeshType == SMESH.VOLUME:
-    #surfaceSubmeshAsRegionHDF5(submesh, elementsList, maxElement, n_elements, PFlotranOutput, name=None)
-    return
-    surfaceSubmeshAsRegionASCII(submesh, ASCIIOutput, name=None)
+    raise RuntimeError('Father mesh not VOLUME, STOP')
+    
+    
+  if outputMeshFormat == 1: #implicit
+    if submeshType == SMESH.VOLUME and fatherMeshType == SMESH.VOLUME:
+      if outputFileFormat == 1: #HDF5
+        volumeSubmeshAsRegionHDF5(submesh, elementsList, maxElement, n_elements,  activeFolder + meshFile, name=None)
+      elif outputFileFormat == 2: #ASCII
+        print('ASCII volume region not implemented in PFLOTRAN')
+    elif submeshType == SMESH.FACE and fatherMeshType == SMESH.VOLUME:
+      if outputFileFormat == 1: #HDF5
+        #surfaceSubmeshAsRegionHDF5(submesh, elementsList, maxElement, n_elements, PFlotranOutput, name=None)
+        print('Exported as ' + activeFolder+submeshName+'.ss')
+        surfaceSubmeshAsRegionASCII(submesh, elementsList, n_elements, activeFolder+submeshName+'.ss', name=None)
+      elif outputFileFormat == 2: #ASCII
+        surfaceSubmeshAsRegionASCII(submesh, elementsList, n_elements, activeFolder+submeshName+'.ss', name=None)
+      return 
+  else:
+    print('Not implemented')
   return
 
 
 
-def surfaceSubmeshAsRegionASCII(submesh, ASCIIOutput, name=None):
+def surfaceSubmeshAsRegionASCII(submesh, elementsList, n_element, ASCIIOutput, name=None):
   from SMESH import VOLUME, FACE
   
   if submesh.GetTypes()[0] == VOLUME:
@@ -76,15 +83,14 @@ def surfaceSubmeshAsRegionASCII(submesh, ASCIIOutput, name=None):
   out = open(ASCIIOutput, 'w')
   
   #write number of element
-  n_element = submesh.GetNumberOfElements()
   out.write(str(n_element)+'\n')
   
   #grab element node list for each element and write it
-  for x in submesh.GetElementsId():
+  for x in elementsList:
       NodesId = submesh.GetMesh().GetElemNodes(x)
       if len(NodesId) == 3: out.write('T ')
       elif len(NodesId) == 4: out.write('Q ')
-      else: sys.exit("PFLOTRAN does not support >4 nodes element type")
+      else: sys.exit("PFLOTRAN does not support >4 nodes element type for instance")
       #TODO: check RHD here ??
       for x in NodesId:
         out.write(str(x)+' ')

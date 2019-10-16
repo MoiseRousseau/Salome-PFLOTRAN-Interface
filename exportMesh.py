@@ -89,7 +89,7 @@ def meshToPFLOTRAN(meshToExport, activeFolder, outputFileFormat, outputMeshForma
   PFlotranOutput = activeFolder + name
   if outputFileFormat == 2: #ASCII
     if outputMeshFormat == 1: #Implicit
-      meshToPFLOTRANUntructuredASCII(meshToExport, n_nodes, n_elements, nodesList, elementsList, meshType, PFlotranOutput)
+      meshToPFLOTRANUntructuredASCII(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput)
     elif outputMeshFormat == 2: #Explicit
       meshToPFLOTRANUnstructuredExplicitASCII(meshToExport, PFlotranOutput)
       
@@ -97,7 +97,7 @@ def meshToPFLOTRAN(meshToExport, activeFolder, outputFileFormat, outputMeshForma
     if outputMeshFormat == 1: #Implicit
       meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput)
     elif outputMeshFormat == 2: #Explicit
-      raise RuntimeError('Explicit exportation not implemented in PFLOTRAN')
+      raise RuntimeError('Explicit HDF5 exportation not implemented in PFLOTRAN')
     
   return
   
@@ -129,27 +129,23 @@ def nonConvex(elementList,mesh):
 
 
 
-def meshToPFLOTRANUntructuredASCII(meshToExport, n_nodes, n_elements, nodesList, elementsList, meshType, PFlotranOutput):
+def meshToPFLOTRANUntructuredASCII(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput):
   from SMESH import VOLUME, FACE
    
   #open pflotran file
   out = open(PFlotranOutput, 'w')
  
-  #initiate 2D/3D element type
-  if meshType == VOLUME:
-    elementCode = {4:'T', 5:'P', 6:'W', 8:'H'}
-  else:
-    elementCode = {3:'T', 4:'Q'}
+  #initiate 3D element type
+  elementCode = {4:'T', 5:'P', 6:'W', 8:'H'}
   
   #pflotran line 1
-  out.write(str(n_element) + ' ' + str(n_nodes) + '\n')
+  out.write(str(n_elements) + ' ' + str(n_nodes) + '\n')
 
-  #pflotran line 2 to n_element_2D/3D +1
+  #pflotran line 2 to n_element_3D +1
   for i in elementsList:
-    elementNode = meshToExport.GetElemNodes(i)
-    out.write(elementCode[len(elementNode)] + ' ')
     
-    elementNode = OrderNodes(elementNode, mesh)
+    elementNode = OrderNodes(i, meshToExport)
+    out.write(elementCode[len(elementNode)] + ' ')
     
     for x in elementNode: #write
       out.write(str(x) + ' ')
