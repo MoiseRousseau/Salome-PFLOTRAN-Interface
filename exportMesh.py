@@ -19,11 +19,6 @@
 
 
 
-
-#TODO
-# 2D element test
-# parallelize code with multiprocessing ?
-
 import sys
 
 
@@ -41,59 +36,68 @@ def progress_bar(iteration, total, barLength=50):
 def meshToPFLOTRAN(meshToExport, activeFolder, outputFileFormat, outputMeshFormat, name=None):
   import salome
   import SMESH
-  smesh = salome.smesh.smeshBuilder.New()
-  #Get mesh input type
-  if isinstance(meshToExport,salome.smesh.smeshBuilder.meshProxy):
-    fatherMesh = smesh.Mesh(meshToExport)
-    if not name: name = fatherMesh.GetName()
-    if fatherMesh.GetElementsByType(SMESH.VOLUME):
-      meshType = SMESH.VOLUME
+  if 0:
+    smesh = salome.smesh.smeshBuilder.New()
+    #Get mesh input type
+    if isinstance(meshToExport,salome.smesh.smeshBuilder.meshProxy):
+      meshToExport = smesh.Mesh(meshToExport)
+      if not name: name = meshToExport.GetName()
+      if meshToExport.GetElementsByType(SMESH.VOLUME):
+        meshType = SMESH.VOLUME
+      else:
+        meshType = SMESH.FACE
+      n_nodes = meshToExport.NbNodes()
+      n_elements = len(meshToExport.GetElementsByType(meshType))
+      nodesList = iter(range(1,n_nodes+1))
+      elementsList = iter(meshToExport.GetElementsByType(meshType))
+      
+    elif isinstance(meshToExport,SMESH._objref_SMESH_Group):
+      if SMESH.VOLUME in meshToExport.GetTypes():
+        meshType = SMESH.VOLUME
+      elif SMESH.FACE in meshToExport.GetTypes():
+        meshType = SMESH.FACE
+      else: raise RuntimeError('1D mesh not supported')
+      meshToExport = smesh.Mesh(meshToExport.GetMesh())
+      n_nodes = len(meshToExport.GetNodeIDs())
+      n_elements = len(meshToExport.GetIDs())
+      nodesList = iter(meshToExport.GetNodeIDs())
+      elementsList = iter(meshToExport.GetIDs())
+      if not name: name = salome.smesh.smeshBuilder.GetName(meshToExport)
+      
+    elif isinstance(meshToExport,salome.smesh.smeshBuilder.submeshProxy):
+      if meshToExport.GetElementsByType(SMESH.VOLUME):
+        meshType = SMESH.VOLUME
+      elif meshToExport.GetElementsByType(SMESH.FACE):
+        meshType = SMESH.FACE
+      else: raise RuntimeError('1D mesh not supported')
+      meshToExport = smesh.Mesh(meshToExport.GetMesh())
+      n_nodes = meshToExport.GetNumberOfNodes(1)
+      n_elements = meshToExport.GetNumberOfElements()
+      nodesList = iter(meshToExport.GetNodesId())
+      elementsList = iter(meshToExport.GetElementsId())
+      if not name: name = salome.smesh.smeshBuilder.GetName(meshToExport)
+      
     else:
-      meshType = SMESH.FACE
-    n_nodes = fatherMesh.NbNodes()
-    n_elements = len(fatherMesh.GetElementsByType(meshType))
-    nodesList = iter(range(1,n_nodes+1))
-    elementsList = iter(fatherMesh.GetElementsByType(meshType))
-    
-  elif isinstance(meshToExport,SMESH._objref_SMESH_Group):
-    if SMESH.VOLUME in meshToExport.GetTypes():
-      meshType = SMESH.VOLUME
-    elif SMESH.FACE in meshToExport.GetTypes():
-      meshType = SMESH.FACE
-    else: raise RuntimeError('1D mesh not supported')
-    fatherMesh = smesh.Mesh(meshToExport.GetMesh())
-    n_nodes = len(meshToExport.GetNodeIDs())
-    n_elements = len(meshToExport.GetIDs())
-    nodesList = iter(meshToExport.GetNodeIDs())
-    elementsList = iter(meshToExport.GetIDs())
-    if not name: name = salome.smesh.smeshBuilder.GetName(meshToExport)
-    
-  elif isinstance(meshToExport,salome.smesh.smeshBuilder.submeshProxy):
-    if meshToExport.GetElementsByType(SMESH.VOLUME):
-      meshType = SMESH.VOLUME
-    elif meshToExport.GetElementsByType(SMESH.FACE):
-      meshType = SMESH.FACE
-    else: raise RuntimeError('1D mesh not supported')
-    fatherMesh = smesh.Mesh(meshToExport.GetMesh())
-    n_nodes = meshToExport.GetNumberOfNodes(1)
-    n_elements = meshToExport.GetNumberOfElements()
-    nodesList = iter(meshToExport.GetNodesId())
-    elementsList = iter(meshToExport.GetElementsId())
-    if not name: name = salome.smesh.smeshBuilder.GetName(meshToExport)
-    
-  else:
-    raise RuntimeError('Selection is not a mesh or part of a mesh. Interruption')
+      raise RuntimeError('Selection is not a mesh or part of a mesh. Interruption')
     
   #Export it
+  n_nodes = meshToExport.NbNodes()
+  n_elements = len(meshToExport.GetElementsByType(SMESH.VOLUME))
+  nodesList = iter(range(1,n_nodes+1))
+  elementsList = iter(meshToExport.GetElementsByType(SMESH.VOLUME))
+  
   PFlotranOutput = activeFolder + name
-  if outputFileFormat == 1: #ASCII
+  if outputFileFormat == 2: #ASCII
     if outputMeshFormat == 1: #Implicit
-      meshToPFLOTRANUntructuredASCII(fatherMesh, n_nodes, n_elements, nodesList, elementsList, meshType, PFlotranOutput + '.ugi')
-    if outputMeshFormat == 2 and isinstance(fatherMesh, salome.smesh.smeshBuilder.Mesh): #Explicit
-      meshToPFLOTRANUnstructuredExplicitASCII(fatherMesh, PFlotranOutput + '.uge')
+      meshToPFLOTRANUntructuredASCII(meshToExport, n_nodes, n_elements, nodesList, elementsList, meshType, PFlotranOutput)
+    elif outputMeshFormat == 2: #Explicit
+      meshToPFLOTRANUnstructuredExplicitASCII(meshToExport, PFlotranOutput)
       
-  elif outputFileFormat == 2: #HDF5
-    meshToPFLOTRANUnstructuredHDF5(meshToExport, fatherMesh, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput + '.h5')
+  elif outputFileFormat == 1: #HDF5
+    if outputMeshFormat == 1: #Implicit
+      meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput)
+    elif outputMeshFormat == 2: #Explicit
+      raise RuntimeError('Explicit exportation not implemented in PFLOTRAN')
     
   return
   
@@ -125,7 +129,7 @@ def nonConvex(elementList,mesh):
 
 
 
-def meshToPFLOTRANUntructuredASCII(fatherMesh, n_nodes, n_elements, nodesList, elementsList, meshType, PFlotranOutput):
+def meshToPFLOTRANUntructuredASCII(meshToExport, n_nodes, n_elements, nodesList, elementsList, meshType, PFlotranOutput):
   from SMESH import VOLUME, FACE
    
   #open pflotran file
@@ -142,7 +146,7 @@ def meshToPFLOTRANUntructuredASCII(fatherMesh, n_nodes, n_elements, nodesList, e
 
   #pflotran line 2 to n_element_2D/3D +1
   for i in elementsList:
-    elementNode = fatherMesh.GetElemNodes(i)
+    elementNode = meshToExport.GetElemNodes(i)
     out.write(elementCode[len(elementNode)] + ' ')
     
     elementNode = OrderNodes(elementNode, mesh)
@@ -154,7 +158,7 @@ def meshToPFLOTRANUntructuredASCII(fatherMesh, n_nodes, n_elements, nodesList, e
   #pflotran line n_element+1 to end
   #write node coordinates
   for i in nodesList:
-    X,Y,Z = fatherMesh.GetNodeXYZ(i)
+    X,Y,Z = meshToExport.GetNodeXYZ(i)
     out.write(str(X) + ' ' + str(Y) + ' ' + str(Z) + '\n')
   
   out.close()
@@ -162,13 +166,11 @@ def meshToPFLOTRANUntructuredASCII(fatherMesh, n_nodes, n_elements, nodesList, e
     
     
 
-def meshToPFLOTRANUnstructuredHDF5(meshToExport, fatherMesh, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput):
+def meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput):
   import numpy
-  try:
-    import h5py
-  except:
-    raise RuntimeError('h5py is not installed.')
+  import h5py
   import gc
+  import SMESH
   
   #open pflotran output file
   out = h5py.File(PFlotranOutput, mode='w')
@@ -182,18 +184,18 @@ def meshToPFLOTRANUnstructuredHDF5(meshToExport, fatherMesh, n_nodes, n_elements
   else: int_type = 'u8'
   
   #only linear element
-  if meshToExport.GetMeshInfo()[16]: #hexa
+  if meshToExport.GetMeshInfo()[SMESH.Entity_Hexa]: #hexa
     elementsArray = numpy.zeros((n_elements,9), dtype=int_type)
-  elif meshToExport.GetMeshInfo()[19]: #prisms
+  elif meshToExport.GetMeshInfo()[SMESH.Entity_Penta]: #prisms
     elementsArray = numpy.zeros((n_elements,7), dtype=int_type)
-  elif meshToExport.GetMeshInfo()[14]: #pyr
+  elif meshToExport.GetMeshInfo()[SMESH.Entity_Pyramid]: #pyr
     elementsArray = numpy.zeros((n_elements,6), dtype=int_type)
-  elif meshToExport.GetMeshInfo()[7] or meshToExport.GetMeshInfo()[12]: #quad or tetra
+  elif meshToExport.GetMeshInfo()[SMESH.Entity_Tetra]: #tetra
     elementsArray = numpy.zeros((n_elements,5), dtype=int_type)
-  elif meshToExport.GetMeshInfo()[4]: #tri
-    elementsArray = numpy.zeros((n_elements,4), dtype=int_type)
+  #elif meshToExport.GetMeshInfo()[4]: #tri
+  #  elementsArray = numpy.zeros((n_elements,4), dtype=int_type)
   else:
-    raise RuntimeError('No linear element of dimension superior to 2 found.')
+    raise RuntimeError('No linear element of dimension 3 found.')
   
   #hdf5 element
   count = 0
@@ -201,7 +203,7 @@ def meshToPFLOTRANUnstructuredHDF5(meshToExport, fatherMesh, n_nodes, n_elements
   for i in elementsList:
     if not count % 100:
       progress_bar(count, n_elements, barLength=50)
-    elementNode = OrderNodes(i, fatherMesh)
+    elementNode = OrderNodes(i, meshToExport)
     elementsArray[count,0] = len(elementNode)
     for j in range(len(elementNode)):
       elementsArray[count,j+1] = elementNode[j]
@@ -216,7 +218,7 @@ def meshToPFLOTRANUnstructuredHDF5(meshToExport, fatherMesh, n_nodes, n_elements
   print('\nCreating Domain/Vertices dataset: ')
   vertexArray = numpy.zeros((n_nodes, 3), dtype='f8')
   for i in nodesList:
-    X,Y,Z = fatherMesh.GetNodeXYZ(i)
+    X,Y,Z = meshToExport.GetNodeXYZ(i)
     vertexArray[i-1,0] = X
     vertexArray[i-1,1] = Y
     vertexArray[i-1,2] = Z

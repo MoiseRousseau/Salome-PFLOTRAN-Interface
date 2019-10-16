@@ -23,7 +23,7 @@
 def PFLOTRANMeshExport(context):
   from PyQt5 import QtCore
   import sys
-  sys.path.append('/home/moise/Ecole/Doc/plugin SALOME/Salome-PFLOTRAN-Interface/')
+  sys.path.insert(1,'/home/moise/Ecole/Doc/plugin SALOME/Salome-PFLOTRAN-Interface/')
   import importlib
   import exportMesh
   import exportSubMesh
@@ -33,28 +33,7 @@ def PFLOTRANMeshExport(context):
   importlib.reload(UI_PFLOTRANTools)
   from salome.gui import helper
   import SMESH
-  print ("\n\n\n")
-  print ("##################################\n")
-  print (" Pflotran mesh converter for Salome 9.2.0 \n")
-  print ("     By Moise Rousseau (2019)     \n")
-  print ("  Export Salome meshes to Pflotran  \n")
-  print ("###################################\n")
-  
-#  def GetFolder(path):
-#    l = path.split('/')
-#    path = ''
-#    for i in range(0,len(l)-1):
-#      path = path + l[i] + '/'
-#    return path
 
-  
-  # get context study, studyId, salomeGui
-  activeStudy = salome.myStudy
-
-  #create folder for exportation
-#  activeFolder = activeStudy._get_URL()
-#  activeFolder = GetFolder(activeFolder)
-#  print ("Mesh to be save in the folder " + activeFolder)
 
   class ExportDialog(QDialog):
     
@@ -70,6 +49,7 @@ def PFLOTRANMeshExport(context):
       #sg.getObjectBrowser().selectionChanged.connect(self.select)
       self.selectMesh = False
       self.selectedMesh = None
+      self.outputFile = '~/' #home bu default
       self.selectSubmesh = False
       self.availableSubmesh = {}
       self.selectedSubmesh = []
@@ -106,6 +86,8 @@ def PFLOTRANMeshExport(context):
         smesh = salome.smesh.smeshBuilder.New()
         self.selectedMesh = smesh.Mesh(self.selectedMesh)
         if not self.selectedMesh.GetElementsByType(SMESH.VOLUME):
+          self.printErrorMessage('PFLOTRAN mesh need to 3-dimensional. Please select a 3D mesh. If you mesh is 1 or 2-dimensional, extrude it in the others direction with an unit length.')
+          self.ui.le_origMeshFile.setText('')
           self.selectedMesh = None
           return
 #      elif isinstance(self.selectedMesh,SMESH._objref_SMESH_Group):
@@ -128,7 +110,7 @@ def PFLOTRANMeshExport(context):
       return
       
     def setOutputFile(self):
-      fd = QFileDialog(self, "Select an output name", self.ui.le_origOutputFile.text(), "All Files (*)")
+      fd = QFileDialog(self, "Select an output name", self.ui.le_origOutputFile.text(), "PFLOTRAN HDF5 File (*.h5);;PFLOTRAN Implicit ASCII grid (*.ugi);;PFLOTRAN Explicit ASCII grid (*.uge);;All Files (*)")
       if fd.exec_():
         self.outputFile = fd.selectedFiles()[0]
         self.ui.le_origOutputFile.setText(self.outputFile)
@@ -190,28 +172,18 @@ def PFLOTRANMeshExport(context):
         dep.removeRow(x.row())
       return
       
-    def removeSubmesh(self):
-      itemsSelected = self.ui.table_toExport.selectedItems()
-      n = self.ui.table_toExport.rowCount()
-      self.ui.table_toExport.setRowCount(n+len(itemsSelected))
-      for i,x in enumerate(itemsSelected):
-        group = self.availableSubmesh[x.text()]
-        item = QTableWidgetItem()
-        item.setText(group.GetName())
-        self.ui.table_toExport.setItem(n+i,0, item)
-        self.ui.table_toExport.setItem(n+i,1, QTableWidgetItem(group.GetName()))
-        if group.GetTypes()[0] == SMESH.VOLUME:
-          self.ui.table_toExport.setItem(n+i,2, QTableWidgetItem('VOLUME'))
-        elif group.GetTypes()[0] == SMESH.FACE:
-          self.ui.table_toExport.setItem(n+i,2, QTableWidgetItem('FACE'))
-        else:
-          pass
-        self.selectedSubmesh.append(group)
-      return
-      
     def helpMessage(self):
       import subprocess
       subprocess.Popen(['firefox'], shell=False)
+      return
+      
+    def printErrorMessage(self, text):
+      import qtsalome
+      msg = qtsalome.QMessageBox()
+      msg.setText(text)
+      msg.setIcon(QMessageBox.Critical)
+      msg.setStandardButtons(QMessageBox.Ok)
+      msg.exec_()
       return
 
 
@@ -219,54 +191,55 @@ def PFLOTRANMeshExport(context):
   window.exec_()
   result = window.result()
   
-  return
-  
+  if result:
+    print ("\n\n\n")
+    print ("##########################################\n")
+    print (" PFLOTRAN mesh converter for Salome 9.3.0 \n")
+    print ("        By Moise Rousseau (2019)     \n")
+    print ("    Export Salome meshes to PPFLOTRAN  \n")
+    print ("##########################################\n")
+    
+    #retrieve data from the GUI
+    meshToExport = window.selectedMesh #Mesh object
+    name = window.outputFile.split('/')[-1]
+    folder = window.outputFile[0:-len(name)]
+    HDF5 = 1 ; ASCII = 2
+    if window.ui.rb_outputFormat[0].isChecked(): 
+      try:
+        import h5py
+        outFormat = HDF5
+      except:
+        window.printErrorMessage('h5py module not installed. You should install it before to export meshes in HDF5 format.')
+        return
+    else: outFormat = ASCII
+    IMPLICIT = 1 ; EXPLICIT = 2
+    if window.ui.rb_gridFormat[0].isChecked(): gridFormat = IMPLICIT
+    else: gridFormat = EXPLICIT
+    groupsToExport = []
+    for row in range(window.ui.table_toExport.rowCount()):
+      groupNameInSalome = window.ui.table_toExport.item(row,0).text()
+      groupNameInOut = window.ui.table_toExport.item(row,1).text()
+      if window.ui.table_toExport.item(row,2).text() == 'VOLUME':
+        groupType = SMESH.VOLUME
+      elif window.ui.table_toExport.item(row,2).text() == 'FACE':
+        groupType = SMESH.FACE
+      group = meshToExport.GetGroupByName(groupNameInSalome, groupType)
+      if len(group) != 1:
+        window.printErrorMessage('Two or more groups have the same name in Salome. Please assign different group name for each group to export')
+      groupsToExport.append([group[0], groupNameInOut])
+    
+      
   #Export selected meshes
-  print ("Export selected mesh")
-  exportMesh.meshToPFLOTRAN(meshToExport, activeFolder, outputFileFormat, outputMeshFormat, name)
+  print ("Export mesh: " + meshToExport.GetName())
+  exportMesh.meshToPFLOTRAN(meshToExport, folder, outFormat, gridFormat, name)
   
   #retrieve submesh
-  if exportSubmesh:
-    smesh = salome.smesh.smeshBuilder.New()
-    fatherMesh = smesh.Mesh(meshToExport.GetMesh())
-    submeshToExport = []
-    if fatherMesh.GetMeshOrder():
-      submeshToExport = fatherMesh.GetMeshOrder()[0]
-    for x in fatherMesh.GetGroups():
-      submeshToExport.append(x)
-    print ("%s submeshes in the corresponding mesh" %len(submeshToExport))    
-
-    if submeshToExport:
-      print("Running submesh exportation")
-      for submesh in submeshToExport:
-        submeshName = salome.smesh.smeshBuilder.GetName(submesh)
-        exportSubMesh.submeshToPFLOTRAN(submesh, activeFolder, submeshName, name, outputFileFormat, outputMeshFormat)
+  if groupsToExport:
+    print ("%s group(s) to export: " %len(groupsToExport))    
+    for (group,groupName) in groupsToExport:
+      exportSubMesh.submeshToPFLOTRAN(group, folder, groupName, name, outFormat, gridFormat)
   else:
-    print("You choose not to export submeshes")
-    
-  if 0:   
-   if unstructuredImplicit:
-      if asciiOut:
-        exportMesh.meshToPFLOTRANUntructuredASCII(meshToExport, activeFolder+name+'.ugi')
-      if hdf5Out:
-        exportMesh.meshToPFLOTRANUnstructuredHDF5(meshToExport, activeFolder+name+'.h5')
-      print("Mesh exportation successful, go to submeshes now")
-      
-      if submeshToExport and exportSubmeshFlag:
-        if asciiOut:
-          print("Warning ! Ascii output not compatible with 3D region assigning, please consider HDF5 output.\n")
-          for submesh in submeshToExport:
-            submeshName = salome.smesh.smeshBuilder.GetName(submesh)
-            print("  Exporting submesh %s to ASCII file: %s" %(submeshName, submeshName+'.ss'))
-            submeshAsRegionASCII(submesh, activeFolder+submeshName+'.ss', submeshName)
-        if hdf5Out:
-          for submesh in submeshToExport:
-            submeshName = salome.smesh.smeshBuilder.GetName(submesh)
-            if submeshName == 'GrRock_Volumes' or submeshName == 'GrPit_Volumes':
-              print("  Exporting submesh to .h5 file: %s" %submeshName)
-              exportSubMesh.submeshAsRegionHDF5(submesh, activeFolder+name+'.h5', submeshName)
-      else: 
-        print("You choose not to export submeshes")
+    print("There is no group to export")
   
   print ("    END \n")
   print ("####################\n\n")

@@ -22,8 +22,6 @@
 
 #TODO
 # 2D region ASCII not working yet
-# 2D element test
-# parallelize code with multiprocessing ?
 
 import sys
 

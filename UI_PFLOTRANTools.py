@@ -176,7 +176,7 @@ class Ui_Dialog(object):
     self.table_header_0.setText(_translate("Dialog", "Available groups"))
     self.label_outputFormat.setText(_translate("Dialog", "Output format:"))
     self.label_gridFormat.setText(_translate("Dialog", "Grid format:"))
-    self.cb_enableAutocompletion.setText(_translate("Dialog", "Enable autocompletion of PLFOTRAN input file"))
+    self.cb_enableAutocompletion.setText(_translate("Dialog", "Enable autocompletion of PFLOTRAN input file"))
     
     #help
     self.pb_help.setText(_translate("Dialog", "Help"))
