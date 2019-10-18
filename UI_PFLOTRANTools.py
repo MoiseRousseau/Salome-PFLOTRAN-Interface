@@ -25,16 +25,16 @@ class Ui_Dialog(object):
   def setupUi(self, Dialog):
     Dialog.setObjectName("Dialog")
     Dialog.resize(450, 380)
-    Dialog.setSizeGripEnabled(False)
+    Dialog.setSizeGripEnabled(True)
     
     #principal layout
     self.gridLayout_main = QtWidgets.QGridLayout(Dialog)
     self.gridLayout_main.setObjectName("gridLayout_main")
     #QtWidgets.QWidget.setLayout(self.gridLayout_main)
     
-    #mesh/output selection
-    self.gridLayout_MSO = QtWidgets.QGridLayout(Dialog)
-    self.gridLayout_MSO.setObjectName("gridLayout_MSO")
+    #mesh selection
+    self.gridLayout_mesh = QtWidgets.QGridLayout(Dialog)
+    self.gridLayout_mesh.setObjectName("gridLayout_mesh")
     #mesh
     self.label_mesh = QtWidgets.QLabel(Dialog)
     self.label_mesh.setObjectName("label_mesh")
@@ -44,21 +44,11 @@ class Ui_Dialog(object):
     self.le_origMeshFile = QtWidgets.QLineEdit(Dialog)
     self.le_origMeshFile.setObjectName("le_origMeshFile")
     self.le_origMeshFile.setReadOnly(True)
-    self.gridLayout_MSO.addWidget(self.label_mesh, 0, 0)
-    self.gridLayout_MSO.addWidget(self.pb_origMeshFile, 0, 2)
-    self.gridLayout_MSO.addWidget(self.le_origMeshFile, 0, 1)
-    #ouptut
-    self.label_output = QtWidgets.QLabel(Dialog)
-    self.label_output.setObjectName("label_output")
-    self.pb_origOutputFile = QtWidgets.QPushButton(Dialog)
-    self.pb_origOutputFile.setObjectName("origOutputFile")
-    self.le_origOutputFile = QtWidgets.QLineEdit(Dialog)
-    self.le_origOutputFile.setObjectName("le_origOutputFile")
-    self.gridLayout_MSO.addWidget(self.label_output, 1, 0)
-    self.gridLayout_MSO.addWidget(self.pb_origOutputFile, 1, 2)
-    self.gridLayout_MSO.addWidget(self.le_origOutputFile, 1, 1)
+    self.gridLayout_mesh.addWidget(self.label_mesh, 0, 0)
+    self.gridLayout_mesh.addWidget(self.pb_origMeshFile, 0, 2)
+    self.gridLayout_mesh.addWidget(self.le_origMeshFile, 0, 1)
     #add layout
-    self.gridLayout_main.addLayout(self.gridLayout_MSO, 0, 0)
+    self.gridLayout_main.addLayout(self.gridLayout_mesh, 0, 0)
     
     #submesh export
     self.gridLayout_submesh = QtWidgets.QGridLayout(Dialog)
@@ -133,7 +123,22 @@ class Ui_Dialog(object):
       self.rb_gridFormatGroup.addButton(radio)
       self.gridLayout_gridFormat.addWidget(radio, 0, i+1)
     self.rb_gridFormat[0].setChecked(True)
+    self.rb_gridFormat[1].setCheckable(False)
     self.gridLayout_main.addLayout(self.gridLayout_gridFormat, 4, 0)
+    
+    #output
+    self.gridLayout_output = QtWidgets.QGridLayout(Dialog)
+    self.gridLayout_output.setObjectName("gridLayout_output")
+    self.label_output = QtWidgets.QLabel(Dialog)
+    self.label_output.setObjectName("label_output")
+    self.pb_origOutputFile = QtWidgets.QPushButton(Dialog)
+    self.pb_origOutputFile.setObjectName("origOutputFile")
+    self.le_origOutputFile = QtWidgets.QLineEdit(Dialog)
+    self.le_origOutputFile.setObjectName("le_origOutputFile")
+    self.gridLayout_output.addWidget(self.label_output, 0, 0)
+    self.gridLayout_output.addWidget(self.pb_origOutputFile, 0, 2)
+    self.gridLayout_output.addWidget(self.le_origOutputFile, 0, 1)
+    self.gridLayout_main.addLayout(self.gridLayout_output, 5, 0)
     
     #autocompletion
     self.gridLayout_autocompletion = QtWidgets.QGridLayout(Dialog)
@@ -143,7 +148,7 @@ class Ui_Dialog(object):
     self.cb_enableAutocompletion.setObjectName("cb_enableAutocompletion")
     self.gridLayout_autocompletion.addWidget(self.cb_enableAutocompletion, 0, 0)
     #addlayout
-    self.gridLayout_main.addLayout(self.gridLayout_autocompletion, 5, 0)
+    self.gridLayout_main.addLayout(self.gridLayout_autocompletion, 6, 0)
     
     #ok and cancel button
     self.splitter = QtWidgets.QSplitter(Dialog)
@@ -155,10 +160,9 @@ class Ui_Dialog(object):
     self.pb_okCancel.setOrientation(QtCore.Qt.Horizontal)
     self.pb_okCancel.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
     self.pb_okCancel.setObjectName("pb_okCancel")
-    self.gridLayout_main.addWidget(self.splitter, 6, 0)
-    self.pb_okCancel.accepted.connect(Dialog.accept)
+    self.gridLayout_main.addWidget(self.splitter, 7, 0)
     self.pb_okCancel.rejected.connect(Dialog.reject)
-      
+    
     self.retranslateUi(Dialog)
     self.setDefaultValue()
     
@@ -177,12 +181,52 @@ class Ui_Dialog(object):
     self.label_outputFormat.setText(_translate("Dialog", "Output format:"))
     self.label_gridFormat.setText(_translate("Dialog", "Grid format:"))
     self.cb_enableAutocompletion.setText(_translate("Dialog", "Enable autocompletion of PFLOTRAN input file"))
-    
     #help
     self.pb_help.setText(_translate("Dialog", "Help"))
-    
+  
+  
   def setDefaultValue(self):
     pass
+  
 
+if 0:
+  class dialogBox(QDialog):
+    
+    def setupUi(self, Dialog):
+      Dialog.setObjectName("Dialog")
+      Dialog.resize(150, 380)
+      Dialog.setSizeGripEnabled(False)
+      
+      #principal layout
+      self.gridLayout_main = QtWidgets.QGridLayout(Dialog)
+      self.gridLayout_main.setObjectName("gridLayout_main")
+      #text
+      self.gridLayout_text = QtWidgets.QGridLayout(Dialog)
+      self.gridLayout_text.setObjectName("gridLayout_text")
+      #mesh
+      self.label_text = QtWidgets.QLabel(Dialog)
+      self.label_text.setObjectName("label_text")
+      self.gridLayout_text.addWidget(self.label_text, 0, 0)
+      self.gridLayout_main.addLayout(self.gridLayout_text, 0, 0)
+      
+      #ok and cancel button
+      self.splitter = QtWidgets.QSplitter(Dialog)
+      self.splitter.setOrientation(QtCore.Qt.Horizontal)
+      self.splitter.setObjectName("splitter")
+      self.pb_help = QtWidgets.QPushButton(self.splitter)
+      self.pb_help.setObjectName("pb_help")
+      self.pb_okCancel = QtWidgets.QDialogButtonBox(self.splitter)
+      self.pb_okCancel.setOrientation(QtCore.Qt.Horizontal)
+      self.pb_okCancel.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+      self.pb_okCancel.setObjectName("pb_okCancel")
+      self.gridLayout_main.addWidget(self.splitter, 1, 0)
+      self.pb_okCancel.accepted.connect(Dialog.accept)
+      self.pb_okCancel.rejected.connect(Dialog.reject)
+      
+    def setText(self, text):
+      self.label_text.setText(text)
+      
+    def setTitle(self, Dialog, title):
+      Dialog.setWindowTitle(title)
 
 

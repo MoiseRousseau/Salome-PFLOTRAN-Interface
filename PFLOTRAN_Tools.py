@@ -23,6 +23,7 @@
 def PFLOTRANMeshExport(context):
   from PyQt5 import QtCore
   import sys
+  import os
   sys.path.insert(1,'/home/moise/Ecole/Doc/plugin SALOME/Salome-PFLOTRAN-Interface/')
   import importlib
   import exportMesh
@@ -58,11 +59,14 @@ def PFLOTRANMeshExport(context):
       
       # Connect up the buttons.
       self.ui.pb_origMeshFile.clicked.connect(self.setMeshInput)
-      self.ui.pb_origOutputFile.clicked.connect(self.setOutputFile)
+      self.ui.pb_origOutputFile.clicked.connect(self.setOutputFile,)
       self.ui.pb_help.clicked.connect(self.helpMessage)
       self.ui.cb_enableSubmesh.clicked.connect(self.enableSubmesh)
       self.ui.pb_addSubmesh.clicked.connect(self.addGroup)
       self.ui.pb_removeSubmesh.clicked.connect(self.removeGroup)
+      self.ui.pb_okCancel.accepted.connect(self.checkValue)
+      self.ui.rb_outputFormat[0].toggled.connect(lambda:self.excludeExplicit(self.ui.rb_outputFormat))
+      self.ui.rb_outputFormat[1].toggled.connect(lambda:self.excludeExplicit(self.ui.rb_outputFormat))
       #self.ui.pb_OutputFile.clicked.connect(self.setOutputFile)
       #self.ui.pb_help.clicked.connect(self.helpMessage)
       
@@ -110,9 +114,29 @@ def PFLOTRANMeshExport(context):
       return
       
     def setOutputFile(self):
-      fd = QFileDialog(self, "Select an output name", self.ui.le_origOutputFile.text(), "PFLOTRAN HDF5 File (*.h5);;PFLOTRAN Implicit ASCII grid (*.ugi);;PFLOTRAN Explicit ASCII grid (*.uge);;All Files (*)")
+      selection = ''
+      h5_string = 'PFLOTRAN HDF5 File (*.h5)'
+      ascii_exp_string = ';PFLOTRAN Explicit ASCII grid (*.uge)'
+      ascii_imp_string = ';PFLOTRAN Implicit ASCII grid (*.ugi)'
+      allFiles_string = 'All Files (*)'
+      d = ';;'
+      if self.ui.rb_outputFormat[0].isChecked(): #HDF5
+        selection = h5_string+d+allFiles_string
+        ext = 'h5'
+      else:
+        if self.ui.rb_gridFormat[0].isChecked(): #implicit
+          selection = ascii_imp_string+d+allFiles_string
+          ext = 'ugi'
+        else: #explicit
+          selection = ascii_exp_string+d+allFiles_string
+          ext = 'uge'
+
+      fd = QFileDialog(self, "Select an output file", self.ui.le_origOutputFile.text(), selection)
       if fd.exec_():
-        self.ui.le_origOutputFile.setText(fd.selectedFiles()[0])
+        text = fd.selectedFiles()[0]
+        if text.split('.')[-1] != ext:
+          text = text + '.' + ext
+        self.ui.le_origOutputFile.setText(text)
       return
       
     def enableSubmesh(self):
@@ -171,14 +195,22 @@ def PFLOTRANMeshExport(context):
         dep.removeRow(x.row())
       return
       
+    def excludeExplicit(self, rb_list):
+      if rb_list[0].isChecked(): #exclude
+        self.ui.rb_gridFormat[1].setCheckable(False)
+      if rb_list[1].isChecked(): #include
+        self.ui.rb_gridFormat[1].setCheckable(True)
+      return
+      
     def helpMessage(self):
       import subprocess
       subprocess.Popen(['firefox'], shell=False)
       return
       
     def printErrorMessage(self, text):
-      import qtsalome
-      msg = qtsalome.QMessageBox()
+      #import qtsalome
+      #msg = qtsalome.QMessageBox()
+      msg = QMessageBox()
       #msg.setTitle('Error!')
       msg.setText(text)
       msg.setIcon(QMessageBox.Critical)
@@ -187,13 +219,51 @@ def PFLOTRANMeshExport(context):
       return
       
     def printInformationMessage(self, text):
-      import qtsalome
-      msg = qtsalome.QMessageBox()
+      #import qtsalome
+      msg = QMessageBox()
       #msg.setTitle('Error!')
       msg.setText(text)
       msg.setIcon(QMessageBox.Information)
       msg.setStandardButtons(QMessageBox.Ok)
       msg.exec_()
+      return
+      
+    def printMessageYesNo(self, text):
+      #import qtsalome
+      msg = QMessageBox()
+      #msg.setTitle('Error!')
+      msg.setText(text)
+      msg.setIcon(QMessageBox.Information)
+      msg.setStandardButtons(QMessageBox.Yes| QMessageBox.No)
+      reply = msg.exec_()
+      if reply == QMessageBox.Yes: return True
+      else: return False
+      
+    def checkValue(self):
+      #check output file
+      if not self.ui.le_origOutputFile.text():
+        self.printErrorMessage('Please provide an output file')
+        return
+      if os.path.isfile(self.ui.le_origOutputFile.text()):
+        res = self.printMessageYesNo('The output file you provided already exist and will be ecrased. Continue ?')
+        if not res:
+          return
+      #h5py module
+      if self.ui.rb_outputFormat[0].isChecked(): 
+        try:
+          import h5py
+        except:
+          self.printErrorMessage('h5py module not installed. You should install it before to export meshes in HDF5 format.')
+          return
+      #export group in explicit
+      if self.selectSubmesh and not self.ui.rb_gridFormat[0].isChecked():
+        res = self.printMessageYesNo('Explicit format group exportation not implemented so far. Group exportation will be ignored. Continue ?')
+        if not res:
+          return
+      
+      #for row in range(window.ui.table_toExport.rowCount()):
+      
+      self.accept()
       return
 
 
@@ -213,21 +283,13 @@ def PFLOTRANMeshExport(context):
     #mesh to export
     meshToExport = window.selectedMesh #Mesh object
     #destination file
-    if window.ui.le_origOutputFile.text():
-      name = window.ui.le_origOutputFile.text().split('/')[-1]
-      folder = window.ui.le_origOutputFile.text()[0:-len(name)]
-    else:
-      window.printErrorMessage('Please provide an output file')
-      return
+    name = window.ui.le_origOutputFile.text().split('/')[-1]
+    folder = window.ui.le_origOutputFile.text()[0:-len(name)]
     #output format
     HDF5 = 1 ; ASCII = 2
     if window.ui.rb_outputFormat[0].isChecked(): 
-      try:
-        import h5py
-        outFormat = HDF5
-      except:
-        window.printErrorMessage('h5py module not installed. You should install it before to export meshes in HDF5 format.')
-        return
+      import h5py
+      outFormat = HDF5
     else: outFormat = ASCII
     #grid format
     IMPLICIT = 1 ; EXPLICIT = 2
@@ -235,9 +297,7 @@ def PFLOTRANMeshExport(context):
     else: gridFormat = EXPLICIT
     #group to export
     groupsToExport = []
-    if window.selectSubmesh and gridFormat == EXPLICIT:
-      window.printInformationMessage('Explicit format group exportation not implemented so far. Group exportation will be ignored.')
-    else:
+    if window.selectSubmesh and not gridFormat == EXPLICIT:
       for row in range(window.ui.table_toExport.rowCount()):
         groupNameInSalome = window.ui.table_toExport.item(row,0).text()
         groupNameInOut = window.ui.table_toExport.item(row,1).text()
@@ -248,29 +308,30 @@ def PFLOTRANMeshExport(context):
         group = meshToExport.GetGroupByName(groupNameInSalome, groupType)
         #warning / error message
         if len(group) != 1:
-          window.printErrorMessage('Two or more groups have the same name in Salome. Please assign different group name for each group to export')
+          window.printErrorMessage('Two or more groups have the same name in Salome. Please assign different group name for each group to export and retry')
         if SMESH.VOLUME in group[0].GetTypes() and outFormat==ASCII:
           window.printErrorMessage('Unable to export ' + groupNameInSalome + ' group. Volume group in ASCII output can not be read by PFLOTRAN since it is not implemented. Try to switch to HDF5 output which work')
           continue
         if SMESH.FACE in group[0].GetTypes() and outFormat==HDF5:
-          window.printInformationMessage('Face group in HDF5 output can not be read by PFLOTRAN since it is not implemented. %s group will be exported in ASCII under the name %s.ss' %(groupNameInSalome, groupNameInOut))
+          res = window.printMessageYesNo('Face group in HDF5 output can not be read by PFLOTRAN since it is not implemented. %s group will be exported in ASCII under the name %s.ss. If this file exist, it will be overwrite. Continue ?' %(groupNameInSalome, groupNameInOut))
+          if not res: return
         groupsToExport.append([group[0], groupNameInOut])
     
-  #Export selected meshes
-  print ("Export mesh: " + meshToExport.GetName())
-  exportMesh.meshToPFLOTRAN(meshToExport, folder, outFormat, gridFormat, name)
-  
-  #retrieve submesh
-  if groupsToExport:
-    print ("%s group(s) to export: " %len(groupsToExport))    
-    for (group,groupName) in groupsToExport:
-      print(groupName)
-      exportSubMesh.submeshToPFLOTRAN(group, groupName, folder, name, outFormat, gridFormat)
-  else:
-    print("There is no group to export")
-  
-  print ("    END \n")
-  print ("####################\n\n")
+    #Export selected meshes
+    print ("Export mesh: " + meshToExport.GetName())
+    exportMesh.meshToPFLOTRAN(meshToExport, folder, outFormat, gridFormat, name)
+    
+    #retrieve submesh
+    if groupsToExport:
+      print ("%s group(s) to export: " %len(groupsToExport))    
+      for (group,groupName) in groupsToExport:
+        print(groupName)
+        exportSubMesh.submeshToPFLOTRAN(group, groupName, folder, name, outFormat, gridFormat)
+    else:
+      print("There is no group to export")
+    
+    print ("    END \n")
+    print ("####################\n\n")
 
   return
   
