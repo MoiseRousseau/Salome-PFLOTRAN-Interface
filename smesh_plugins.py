@@ -23,22 +23,10 @@ import salome_pluginsmanager
 ACTIVATE_PLUGIN = True
 
 if ACTIVATE_PLUGIN:
-  # Check that GEOM and SMESH modules are present
-  try:
-    import GEOM
-    from salome.geom import geomBuilder
-    geompy = geomBuilder.New()
-    
-    import SMESH, SALOMEDS
-    from salome.smesh import smeshBuilder
-    smesh =  smeshBuilder.New()
-  except:
-    ACTIVATE_PLUGIN = False
-
-if ACTIVATE_PLUGIN:
+  #get user
+  import os
+  user = os.getlogin()
   #load plugin
-  pluginManagerPath = 'lib/python3.6/site-packages/salome/salome_pluginsmanager.py'
-  path = repr(__file__).split(pluginManagerPath)[0]
-  path += 'share/salome/plugins/gui/Salome-PFLOTRAN-Interface-master/'
-  exec(open(path[1:] + 'PFLOTRAN_Tools.py').read())
-  exec(open(path[1:] + 'EDZ_Permeability_assignment.py').read())
+  path = '/home/%s/.config/salome/Plugins/' %(user)
+  exec(open(path + 'PFLOTRAN_mesh_export/PFLOTRAN_Tools.py').read())
+  exec(open(path + 'PFLOTRAN_EDZ_perm_dataset_creator/EDZ_permeability_dataset.py').read())
