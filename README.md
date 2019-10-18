@@ -1,6 +1,6 @@
 # Salome PFLOTRAN Interface
 
-Interface the Salome CAD software (https://www.salome-platform.org/) with the finite volume PFLOTRAN reactive transport subsurface simulator (https://www.pflotran.org/). This interface take the form of a Python plugin in Salome software (write in Python 3) and export mesh and region created by Salome mesh module into a readable format by PFLOTRAN code. Various PFLOTRAN input format are implemented (ASCII and HDF5 file and unstructured implicit/explicit grid description). This plugin was developped to facilitate simulation of several phenomenons in complex geometries which can not be generated and/or meshed within PFLOTRAN. 
+Interface the Salome CAD software (https://www.salome-platform.org/) with the finite volume PFLOTRAN reactive transport subsurface simulator (https://www.pflotran.org/). This interface take the form of a Python plugin in Salome software (write in Python 3) and export mesh and groups created by Salome mesh module into a readable format by PFLOTRAN code. Various PFLOTRAN input format are implemented (ASCII and HDF5 file and unstructured implicit/explicit grid description). This plugin was developped to facilitate simulation of several phenomenons in complex geometries which can not be generated and/or meshed within PFLOTRAN. 
 
 ## Features
 * Export 3D meshes created within Salome mesh module in a readable format by PFLOTRAN.
@@ -8,18 +8,16 @@ Interface the Salome CAD software (https://www.salome-platform.org/) with the fi
 * Unstructured implicit / explicit grid type format.
 * Export 3D meshes in ASCII or HDF5 format.
 * Around 400,000 elements per minutes on single thread and on a Intel Core i5 5300U.
-* Export 3D submeshes (parts of the principal mesh) in HDF5 format to define region in PFLOTRAN.
-* Export 2D submeshes in ASCII format to define boundary / initial condition (HDF5 format not implemented in PFLOTRAN yet).
+* Export 3D groups (parts of the principal mesh) in HDF5 format to define region in PFLOTRAN.
+* Export 2D groups in ASCII format to define boundary / initial condition (HDF5 format not implemented in PFLOTRAN yet).
 
 ## Features to come:
-* GUI
 * Clipped Voronoi meshes
-* Submeshes to export selection
 * PFLOTRAN input file autocompletion
 
 ## Getting Started
 
-This plugin was tested on the latest release of Salome (which is up to date 9.3.0) running on Ubuntu 18.04.2 LTS. Nevertheles, it should work for newer release of Salome and for other platform. Note Salome switch to Python 3 since version 9.2.0 (February 2019) and consequently, the plugin could not compatible with older version than 9.2.0.
+This plugin was tested on the latest release of Salome (which is up to date 9.3.0) running on Ubuntu 18.04.3 LTS. Nevertheles, it should work for newer release of Salome and for other platform. Note Salome switch to Python 3 since version 9.2.0 (February 2019) and consequently, the plugin could not compatible with older Salome version than 9.2.0.
 
 ### Prerequisites
 
@@ -54,15 +52,22 @@ python pip-19.1.1-py2.py3-none-any.whl/pip install h5py-2.9.0.tar.gz
 ### Installing
 
 Installation of the plugin is done in three steps:
-1. Download it.
-2. Unzip it into the folder ```$SalomeRootFolder/BINARIES-UB18.04/GUI/share/salome/plugins/gui/``` where `$SalomeRootFolder` is the path to your Salome installation.
+1. Download the repository in your machine
+2. Unzip it into the folder `/home/$YOUR_USER_NAME/.config/salome/Plugins/`
+3. You are ready to go
 
 ## Use the plugin
 
-To export your mesh from Salome to PFLOTRAN:
-1. Select the mesh, submesh or group of meshes you want to export
-2. Click on `Tool/Plugins/PFLOTRAN Tools GUI/Export mesh to PFLOTRAN_GUI`
-3. Your mesh and all its submeshes will be exported in the folder where you save your Salome study.
+To export meshes from Salome to PFLOTRAN:
+1. Click on `Mesh/SMESH plugins/Salome-PFLOTRAN-Interface/Export mesh to PFLOTRAN`
+2. Select the mesh you want to export by clicking `Select` and select the mesh in Salome object browser
+3. If you want to export group as PFLOTRAN regions, click on the corresponding checkbox and use to +/- pushbutton to add or remove groups. You can provide region name by changing the `Name` cell value
+4. Select the desired output format and grid format (note explicit grid format with HDF output is not implemented in PFLOTRAN yet).
+5. Provide an ouput file
+6. If you want your PFLOTRAN input file autocompleted with minimum command you need to provide and grid and region already defined, check the corresponding box (not working yet).
+7. Press `OK` to start the exportation
+
+An example Salome study file is provided in the folder `example`. You can open it, load the SMESH module and have a look of the different meshes.
 
 ## Know limitations
 

@@ -336,7 +336,7 @@ def PFLOTRANMeshExport(context):
   return
   
   
-salome_pluginsmanager.AddFunction('PFLOTRAN Tools GUI/Export mesh to PFLOTRAN_GUI_real',
-                                  'Export mesh and submesh to PFLOTRAN readable format',
+salome_pluginsmanager.AddFunction('Salome-PFLOTRAN-Interface/Export mesh to PFLOTRAN',
+                                  'Export mesh and groups to PFLOTRAN readable format',
                                   PFLOTRANMeshExport)
 
