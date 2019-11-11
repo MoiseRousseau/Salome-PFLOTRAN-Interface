@@ -25,8 +25,15 @@ ACTIVATE_PLUGIN = True
 if ACTIVATE_PLUGIN:
   #get user
   import os
+  import sys
+
+  #common to all plugin in .config/salome/Plugins folder
   user = os.getlogin()
-  #load plugin
   path = '/home/%s/.config/salome/Plugins/' %(user)
-  exec(open(path + 'PFLOTRAN_mesh_export/PFLOTRAN_Tools.py').read())
-  exec(open(path + 'PFLOTRAN_EDZ_perm_dataset_creator/EDZ_permeability_dataset.py').read())
+  
+  #load Export plugin
+  sys.path.append(path+'PFLOTRAN_mesh_export/') #path to plugin component for importation
+  exec(open(path + 'PFLOTRAN_mesh_export/PFLOTRAN_Tools.py').read()) #the plugin
+  
+  #if you have other plugin to import, add it here
+  #exec(open(path + 'PFLOTRAN_EDZ_perm_dataset_creator/EDZ_permeability_dataset.py').read())

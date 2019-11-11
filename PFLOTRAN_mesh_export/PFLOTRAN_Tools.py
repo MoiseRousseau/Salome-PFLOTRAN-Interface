@@ -24,14 +24,15 @@ def PFLOTRANMeshExport(context):
   from PyQt5 import QtCore
   import sys
   import os
-  sys.path.insert(1,'/home/moise/Ecole/Doc/plugin SALOME/Salome-PFLOTRAN-Interface/')
   import importlib
+  #import plugin component
   import exportMesh
   import exportSubMesh
-  import UI_PFLOTRANTools
+  import UI_PFLOTRAN_Tools
+  #reload it to make modification reloaded
   importlib.reload(exportMesh)
   importlib.reload(exportSubMesh)
-  importlib.reload(UI_PFLOTRANTools)
+  importlib.reload(UI_PFLOTRAN_Tools)
   from salome.gui import helper
   import SMESH
 
@@ -42,7 +43,7 @@ def PFLOTRANMeshExport(context):
       QDialog.__init__(self)
       # Set up the user interface from Designer.
       #self.ui = EDZ_permeability_dataset_GUI.Ui_Dialog()
-      self.ui = UI_PFLOTRANTools.Ui_Dialog()
+      self.ui = UI_PFLOTRAN_Tools.Ui_Dialog()
       self.ui.setupUi(self)
       self.show()
       
