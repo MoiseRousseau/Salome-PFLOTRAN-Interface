@@ -34,6 +34,7 @@ def PFLOTRANMeshExport(context):
   importlib.reload(exportSubMesh)
   importlib.reload(UI_PFLOTRAN_Tools)
   from salome.gui import helper
+  from salome.smesh import smeshBuilder
   import SMESH
 
 
@@ -275,8 +276,8 @@ def PFLOTRANMeshExport(context):
   if result:
     print ("\n\n\n")
     print ("##########################################\n")
-    print (" PFLOTRAN mesh converter for Salome 9.3.0 \n")
-    print ("        By Moise Rousseau (2019)     \n")
+    print (" PFLOTRAN mesh converter for Salome 9.4.0 \n")
+    print ("        By Moise Rousseau (2020)     \n")
     print ("    Export Salome meshes to PPFLOTRAN  \n")
     print ("##########################################\n")
     
