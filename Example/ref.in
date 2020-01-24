@@ -1,0 +1,221 @@
+#Description: Rotated grid simulation for full tensor implementation verification
+
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+    SUBSURFACE_FLOW flow
+      MODE RICHARDS
+    /
+    SUBSURFACE_TRANSPORT transport
+      GLOBAL_IMPLICIT
+    /
+  /
+END
+
+SUBSURFACE
+
+
+#=========================== tracer options ===================================
+CHEMISTRY
+  PRIMARY_SPECIES
+    Tracer
+  /
+  OUTPUT
+    PRIMARY_SPECIES
+    TOTAL
+  /
+END
+
+FLUID_PROPERTY
+  DIFFUSION_COEFFICIENT 1.d-9
+END
+
+
+#=========================== discretization ===================================
+GRID
+  TYPE STRUCTURED mesh_ref_ugi.h5
+  NXYZ 40 40 40
+  BOUNDS
+    0 0 0
+    1000 1000 200
+  /
+END
+
+
+
+#=========================== material properties ==============================
+MATERIAL_PROPERTY soil1
+  ID 1
+  POROSITY 0.095
+  TORTUOSITY 0.1
+  SATURATION_FUNCTION default
+  PERMEABILITY
+    ISOTROPIC
+    PERM_ISO 1e-11
+  /
+END
+
+
+#=========================== characteristic curves ============================
+CHARACTERISTIC_CURVES default
+  DEFAULT
+END
+
+
+#=========================== output options ===================================
+OUTPUT
+  FORMAT HDF5
+  MASS_BALANCE
+  #VELOCITY_AT_CENTER
+  PERIODIC_OBSERVATION TIMESTEP 1
+  #PERIODIC TIME 1 y
+END
+
+
+#=========================== times ============================================
+TIME
+  FINAL_TIME 10 y
+  INITIAL_TIMESTEP_SIZE 1 y
+  MAXIMUM_TIMESTEP_SIZE 1 y
+END
+
+#REFERENCE_PRESSURE 101325.
+
+
+
+#=========================== regions ==========================================
+
+REGION all
+  COORDINATES
+    -10000 -10000 -10000
+    10000 10000 10000
+  /
+END
+
+REGION injection
+  COORDINATE 112.5 112.5 22.5
+END
+
+REGION extraction
+  COORDINATE 887.5 887.5 177.5
+END
+
+REGION obs1
+  COORDINATE 362.5 612.5 82.5
+END
+
+REGION obs2
+  COORDINATE 762.5 512.5 112.5
+END
+
+REGION obs3
+  COORDINATE 487.5 662.5 172.5
+END
+
+
+#=========================== observations points===============================
+OBSERVATION
+  REGION obs1
+END
+
+OBSERVATION
+  REGION obs2
+END
+
+OBSERVATION
+  REGION obs3
+END
+
+
+#=========================== flow conditions ==================================
+FLOW_CONDITION initial
+  TYPE
+    PRESSURE DIRICHLET
+  /
+  PRESSURE 10201325.d0
+END
+
+! Note# Do not use scaled_volumetric_rate below.  The mass balance blows up.
+
+FLOW_CONDITION injection
+  TYPE
+    RATE SCALED_MASS_RATE VOLUME
+  /
+  RATE 15 kg/s
+END
+
+FLOW_CONDITION extraction
+  TYPE
+    RATE SCALED_MASS_RATE VOLUME
+  /
+  RATE -15 kg/s
+END
+
+
+#=========================== transport conditions ==================================
+CONSTRAINT constant
+  CONCENTRATIONS
+    Tracer 1.d0 T
+  /
+END
+
+CONSTRAINT ini
+  CONCENTRATIONS
+    Tracer 1e-6 T
+  /
+END
+
+TRANSPORT_CONDITION constant
+  TYPE DIRICHLET
+    CONSTRAINT_LIST
+      0.d0 constant
+    /
+END
+
+TRANSPORT_CONDITION ini
+  TYPE DIRICHLET
+    CONSTRAINT_LIST
+      0.d0 ini
+    /
+END
+
+TRANSPORT_CONDITION zero_grad
+  TYPE ZERO_GRADIENT
+  CONSTRAINT_LIST
+    0.d0 ini
+  /
+END
+
+
+#=========================== condition couplers ===============================
+# initial condition
+INITIAL_CONDITION
+  FLOW_CONDITION initial
+  TRANSPORT_CONDITION ini
+  REGION all
+END
+
+SOURCE_SINK injection
+  FLOW_CONDITION injection
+  TRANSPORT_CONDITION constant
+  REGION injection
+END
+
+SOURCE_SINK extraction
+  FLOW_CONDITION extraction
+  TRANSPORT_CONDITION zero_grad
+  REGION extraction
+END
+
+
+
+#=========================== stratigraphy couplers ============================
+STRATA
+  REGION all
+  MATERIAL soil1
+END
+
+
+
+
+END_SUBSURFACE
