@@ -56,28 +56,50 @@ def submeshToPFLOTRAN(submesh, submeshName, activeFolder, meshFile=None, outputF
       if outputFileFormat == 1: #HDF5
         volumeSubmeshAsRegionHDF5(submesh, elementsList, maxElement, n_elements,  activeFolder + meshFile, name=None)
       elif outputFileFormat == 2: #ASCII
-        print('ASCII volume region not implemented in PFLOTRAN')
+        volumeSubmeshAsRegionASCII(submesh, elementsList, n_elements, activeFolder+submeshName+'.vs')
     elif submeshType == SMESH.FACE and fatherMeshType == SMESH.VOLUME:
       if outputFileFormat == 1: #HDF5
         #surfaceSubmeshAsRegionHDF5(submesh, elementsList, maxElement, n_elements, PFlotranOutput, name=None)
         print('Exported as ' + activeFolder+submeshName+'.ss')
-        surfaceSubmeshAsRegionASCII(submesh, elementsList, n_elements, activeFolder+submeshName+'.ss', name=None)
+        surfaceSubmeshAsRegionASCII(submesh, elementsList, n_elements, activeFolder+submeshName+'.ss')
       elif outputFileFormat == 2: #ASCII
-        surfaceSubmeshAsRegionASCII(submesh, elementsList, n_elements, activeFolder+submeshName+'.ss', name=None)
+        surfaceSubmeshAsRegionASCII(submesh, elementsList, n_elements, activeFolder+submeshName+'.ss')
       return 
-  else:
-    print('Not implemented')
+      
+  elif outputMeshFormat == 2: #explicit
+    if submeshType == SMESH.VOLUME and fatherMeshType == SMESH.VOLUME:
+      if outputFileFormat == 1: #HDF5
+        print("Non implemented yet") 
+        return
+      elif outputFileFormat == 2: #ASCII
+        volumeSubmeshAsRegionASCII(submesh, elementsList, n_elements, activeFolder+submeshName+'.vs')
+    elif submeshType == SMESH.FACE and fatherMeshType == SMESH.VOLUME:
+      if outputFileFormat == 1: #HDF5
+        print('Not implemented')
+      elif outputFileFormat == 2: #ASCII
+        surfaceSubmeshUnstructuredExplicit(submesh, elementsList, n_elements, activeFolder+submeshName+'.ex')
+      return 
+    
+  return
+
+
+
+def volumeSubmeshAsRegionASCII(submesh, elementsList, n_element, ASCIIOutput, name=None):
+  from SMESH import VOLUME, FACE
+   
+  #open pflotran file
+  out = open(ASCIIOutput, 'w')
+  
+  #grab element node list for each element and write it
+  for x in elementsList:
+    out.write(str(x)+'\n')
+  out.close()
   return
 
 
 
 def surfaceSubmeshAsRegionASCII(submesh, elementsList, n_element, ASCIIOutput, name=None):
   from SMESH import VOLUME, FACE
-  
-  if submesh.GetTypes()[0] == VOLUME:
-    print("3D region not supported yet for ASCII region input")
-    print("This submesh will be ignored")
-    return
    
   #open pflotran file
   out = open(ASCIIOutput, 'w')
@@ -87,76 +109,16 @@ def surfaceSubmeshAsRegionASCII(submesh, elementsList, n_element, ASCIIOutput, n
   
   #grab element node list for each element and write it
   for x in elementsList:
-      NodesId = submesh.GetMesh().GetElemNodes(x)
-      if len(NodesId) == 3: out.write('T ')
-      elif len(NodesId) == 4: out.write('Q ')
-      else: sys.exit("PFLOTRAN does not support >4 nodes element type for instance")
-      #TODO: check RHD here ??
-      for x in NodesId:
-        out.write(str(x)+' ')
-      out.write('\n')
+    NodesId = submesh.GetMesh().GetElemNodes(x)
+    if len(NodesId) == 3: out.write('T ')
+    elif len(NodesId) == 4: out.write('Q ')
+    else: sys.exit("PFLOTRAN does not support >4 nodes element type for instance")
+    for x in NodesId:
+      out.write(str(x)+' ')
+    out.write('\n')
   out.close()
   return
- 
- 
   
-def volumeSubmeshAsRegionHDF5(submesh, elementsList, maxElement, n_elements, PFlotranOutput, name=None):
-  import SMESH
-  import numpy as np
-  import h5py
-  import salome
-  
-  #region name
-  if not name:
-    name = salome.smesh.smeshBuilder.GetName(submesh)
-    
-  #open pflotran file
-  out = h5py.File(PFlotranOutput, 'r+')
-  
-  #create region folder
-  try:
-    regionGroup = out['Regions']
-  except:
-    regionGroup = out.create_group('Regions')
-
-  #create region
-  submeshGroup = regionGroup.create_group(name)
-
-  int_type = np.log(submesh.GetMesh().GetElementsByType(SMESH.VOLUME).index(maxElement)+1)/np.log(2)/8
-  if int_type <= 1: int_type = 'u1'
-  elif int_type <= 2: int_type = 'u2'
-  elif int_type <= 4: int_type = 'u4'
-  else: int_type = 'u8'
-
-  #export the submesh
-  elementData = np.zeros(n_elements, dtype=int_type)
-  fatherMeshCells = submesh.GetMesh().GetElementsByType(SMESH.VOLUME)
-  #We need correspondance between mesh element in salome and in HDF5
-  d = {fatherMeshCells[i]: i+1 for i in range(len(fatherMeshCells))}
-  count = 0
-  for x in elementsList:
-    elementData[count] = d[x]
-    count += 1
-    
-  out.create_dataset('Regions/%s/Cell Ids' %name, data=elementData)
-
-  out.close()
-  return
-
-
-
-def determineType(mesh):
-  from SMESH import VOLUME, FACE, EDGE
-  if VOLUME in mesh.GetTypes():
-    meshDim = 3
-  elif FACE in mesh.GetTypes():
-    meshDim = 2
-  elif EDGE in mesh.GetTypes():
-    meshDim = 1
-  else:
-    sys.exit("Impossible !")
-  return meshDim
-
 
 
 def surfaceSubmeshAsRegionHDF5(submesh, elementsList, maxElement, n_elements, PFlotranOutput, name=None):
@@ -208,28 +170,59 @@ def surfaceSubmeshAsRegionHDF5(submesh, elementsList, maxElement, n_elements, PF
   
   out.close()
   return
-
-
-
-def submeshToPFLOTRANUnstructuredExplicit(submesh, corresp, folder, name=None):
+ 
+ 
+  
+def volumeSubmeshAsRegionHDF5(submesh, elementsList, maxElement, n_elements, PFlotranOutput, name=None):
+  import SMESH
+  import numpy as np
+  import h5py
+  import salome
+  
+  #region name
   if not name:
     name = salome.smesh.smeshBuilder.GetName(submesh)
     
-  motherMesh = submesh.GetMesh() #meshProxy object
-  motherMeshType = determineType(motherMesh)
-  submeshType = determineType(submesh)
+  #open pflotran file
+  out = h5py.File(PFlotranOutput, 'r+')
   
-  if submeshType == motherMeshType:
-    HDF5File = motherMesh.GetName() + '.h5'
-    submeshToHDF5SameDimension(submesh, folder + HDF5File, name)
-  elif submeshType == motherMeshType - 1:
-   submeshToASCIIDimensionMinus1IExplicit(submesh, corresp, folder+name+'.ex')
+  #create region folder
+  try:
+    regionGroup = out['Regions']
+  except:
+    regionGroup = out.create_group('Regions')
+
+  #create region
+  submeshGroup = regionGroup.create_group(name)
+
+  int_type = np.log(submesh.GetMesh().GetElementsByType(SMESH.VOLUME).index(maxElement)+1)/np.log(2)/8
+  if int_type <= 1: int_type = 'u1'
+  elif int_type <= 2: int_type = 'u2'
+  elif int_type <= 4: int_type = 'u4'
+  else: int_type = 'u8'
+
+  #export the submesh
+  elementData = np.zeros(n_elements, dtype=int_type)
+  fatherMeshCells = submesh.GetMesh().GetElementsByType(SMESH.VOLUME)
+  #We need correspondance between mesh element in salome and in HDF5
+  d = {fatherMeshCells[i]: i+1 for i in range(len(fatherMeshCells))}
+  count = 0
+  for x in elementsList:
+    elementData[count] = d[x]
+    count += 1
+    
+  out.create_dataset('Regions/%s/Cell Ids' %name, data=elementData)
+
+  out.close()
   return
 
 
-  
-  
-def submeshToASCIIDimensionMinus1IExplicit(submesh, corresp, name):
+
+
+def surfaceSubmeshUnstructuredExplicit(submesh, corresp, folder, name=None):
+  if not name:
+    name = salome.smesh.smeshBuilder.GetName(submesh)
+    
   import salome
   out = open(name, 'w')
   try:
