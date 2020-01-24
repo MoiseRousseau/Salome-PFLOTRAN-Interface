@@ -258,10 +258,10 @@ def PFLOTRANMeshExport(context):
           self.printErrorMessage('h5py module not installed. You should install it before to export meshes in HDF5 format.')
           return
       #export group in explicit
-      if self.selectSubmesh and not self.ui.rb_gridFormat[0].isChecked():
-        res = self.printMessageYesNo('Explicit format group exportation not implemented so far. Group exportation will be ignored. Continue ?')
-        if not res:
-          return
+      #if self.selectSubmesh and not self.ui.rb_gridFormat[0].isChecked():
+      #  res = self.printMessageYesNo('Explicit format group exportation not implemented so far. Group exportation will be ignored. Continue ?')
+      #  if not res:
+      #    return
       
       #for row in range(window.ui.table_toExport.rowCount()):
       
@@ -299,7 +299,7 @@ def PFLOTRANMeshExport(context):
     else: gridFormat = EXPLICIT
     #group to export
     groupsToExport = []
-    if window.selectSubmesh and not gridFormat == EXPLICIT:
+    if window.selectSubmesh: #and not gridFormat == EXPLICIT:
       for row in range(window.ui.table_toExport.rowCount()):
         groupNameInSalome = window.ui.table_toExport.item(row,0).text()
         groupNameInOut = window.ui.table_toExport.item(row,1).text()

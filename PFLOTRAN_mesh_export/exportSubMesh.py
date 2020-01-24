@@ -90,9 +90,14 @@ def volumeSubmeshAsRegionASCII(submesh, elementsList, n_element, ASCIIOutput, na
   #open pflotran file
   out = open(ASCIIOutput, 'w')
   
+  
+  #We need correspondance between mesh element in salome and in HDF5
+  fatherMeshCells = submesh.GetMesh().GetElementsByType(VOLUME)
+  d = {fatherMeshCells[i]: i+1 for i in range(len(fatherMeshCells))}
+  
   #grab element node list for each element and write it
   for x in elementsList:
-    out.write(str(x)+'\n')
+    out.write(str(d[x])+'\n')
   out.close()
   return
 
