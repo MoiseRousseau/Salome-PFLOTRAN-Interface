@@ -383,38 +383,66 @@ def OrderNodes(elementNumber, mesh):
 
 def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput):
   from SMESH import VOLUME, FACE
+  import numpy as np
   
-  def ordonateNodes(nodesList):
-    index = nodesList.index(min(nodesList))
-    if index:
-      nodesList = nodesList[index:]+nodesList[:index]
-    if nodesList[-1] < nodesList[1]:
-      nodesList = [nodesList[0]]+nodesList[1:][::-1]
-    return nodesList
+  def getNormal(nodesId):
+    p1 = np.array(mesh.GetNodeXYZ(nodesId[0]), dtype='f8')
+    p2 = np.array(mesh.GetNodeXYZ(nodesId[1]), dtype='f8')
+    p3 = np.array(mesh.GetNodeXYZ(nodesId[2]), dtype='f8')
+    v1 = p2 - p1
+    v1 /= np.sqrt(np.dot(v1,v1))
+    v2 = p3 - p1
+    v2 /= np.sqrt(np.dot(v2,v2))
+    v3 = np.cross(v1, v2)
+    i = 3
+    while np.dot(v3,v3) < 1e-3:
+      if i == len(nodesId): break
+      p3 = np.array(mesh.GetNodeXYZ(nodesId[i]), dtype='f8')
+      v2 = p3 - p1
+      v2 /= np.sqrt(np.dot(v2,v2))
+      v3 = np.cross(v1, v2)
+      i += 1
+    return v3
   
-  def createInternalFace(mesh):
-    nodesFaceOrdered = set()
-    for cell in mesh.GetElementsByType(meshType):
-      faceId = 0
-      while mesh.GetElemFaceNodes(cell, faceId):
-        nodes = mesh.GetElemFaceNodes(cell, faceId)
-        nodes = tuple(ordonateNodes(nodes))
-        connectivity = len(mesh.GetElementsByNodes(nodes, meshType))
-        if nodes not in nodesFaceOrdered and connectivity == 2:
-          nodesFaceOrdered.add(nodes)
-        faceId += 1
-    count = 0
-    newFacesIds = [int(0) for x in range(len(nodesFaceOrdered))]
-    for face in nodesFaceOrdered:
-      if len(face) == 4: newFaceId = mesh.AddFace(face)
-      elif len(face) == 3: newFaceId = mesh.AddFace(face)
-      else: newFaceId = mesh.AddPolygonalFace(face)
-      newFacesIds[count] = newFaceId
-      count += 1
-    if 0:
-      mesh.MakeGroupByIds("Internal faces", FACE, newFacesIds)
-    return newFacesIds
- 
+  def computeArea(nodesId):
+    #http://geomalgorithms.com/a01-_area.html#2D%20Polygons
+    if len(nodesId) < 3: return 0
+    #initiate
+    normal = getNormal(nodesId)
+    points = np.zeros((len(nodesId)+2,3), dtype='f8')
+    for i in range(len(nodesId)):
+      points[i] = mesh.GetNodeXYZ(nodesId[i])
+    points[len(nodesId)] = mesh.GetNodeXYZ(nodesId[0])
+    points[len(nodesId)+1] = mesh.GetNodeXYZ(nodesId[1])
+    #select projection plane
+    ic = 0
+    jc = 1
+    coord = 2
+    if abs(normal[0]) > abs(normal[1]): 
+      if abs(normal[0]) > abs(normal[2]): 
+        ic = 1
+        jc = 2
+        coord = 0
+    elif abs(normal[1]) > abs(normal[2]): 
+      ic = 2
+      jc = 0
+      coord = 1
+    #compute area
+    area = 0
+    for i in range(1,len(nodesId)+1):
+      area += points[i][ic] * (points[i+1][jc] - points[i-1][jc])
+    #scale to get get area before projection
+    area *= np.sqrt(np.dot(normal,normal)) / (2*normal[coord])
+    
+    return abs(area)
+     
+  def computeCenter(nodesId):
+    center = np.zeros((3), dtype='f8')
+    for node in nodesId:
+      center += mesh.GetNodeXYZ(node)
+    center /= len(nodesId)
+    return center
+  
   #open pflotran output file
   out = open(PFlotranOutput, mode='w')
   
@@ -453,20 +481,29 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput):
   else:
     connectionType = EDGE
     sys.exit("EDGE connection not supported yet")
-
-  faceIds = createInternalFace(mesh)
-  out.write("CONNECTIONS {}\n".format(len(faceIds)))
-  for faceId in faceIds:
-    nodes = mesh.GetElemNodes(faceId)
-    elementList = mesh.GetElementsByNodes(nodes, meshType)
-    for x in elementList:
-      out.write("{} ".format(corresp[x]))
-    center = mesh.BaryCenter(faceId)
-    area = mesh.GetArea(faceId)
-    for x in center:
-      out.write("{} ".format(x))
-    out.write("{}\n".format(area))
-  
+    
+  sharedFaceDict = {}
+  faceArea = {}
+  volIDs = mesh.GetElementsByType( VOLUME )
+  for v in volIDs:
+    nbF = mesh.ElemNbFaces( v )
+    for f in range(0,nbF):
+      vFNodes = mesh.GetElemFaceNodes( v, f )
+      dictKey = tuple(sorted(vFNodes))
+      if dictKey not in sharedFaceDict:
+        sharedFaceDict[ dictKey ] = [ v ]
+      else:
+        sharedFaceDict[ dictKey ].append( v )
+        faceArea[tuple(sharedFaceDict[ dictKey ])] = computeArea(vFNodes)
+        
+  for f,v in sharedFaceDict.items():
+    if len(v) == 2:
+      area = faceArea[tuple(v)]
+      center = computeCenter(f)
+      out.write(str(v[0])+ ' ' + str(v[1]) + ' ')
+      for x in center: out.write(str(x) + ' ')
+      out.write(str(area) + '\n')
+   
   out.close()
 
   return corresp

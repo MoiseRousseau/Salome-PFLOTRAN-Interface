@@ -34,6 +34,9 @@ if ACTIVATE_PLUGIN:
   #load Export plugin
   sys.path.append(path+'PFLOTRAN_mesh_export/') #path to plugin component for importation
   exec(open(path + 'PFLOTRAN_mesh_export/PFLOTRAN_Tools.py').read()) #the plugin
+  #load grid check
+  sys.path.append(path+'Grid_check/') #path to plugin component for importation
+  exec(open(path + 'Grid_check/makeChecks.py').read()) #the plugin
   
   #if you have other plugin to import, add it here
   #exec(open(path + 'PFLOTRAN_EDZ_perm_dataset_creator/EDZ_permeability_dataset.py').read())
