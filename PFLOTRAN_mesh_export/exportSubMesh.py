@@ -31,7 +31,8 @@ def submeshToPFLOTRAN(submesh, submeshName, activeFolder, meshFile=None, outputF
   import salome
   #Get mesh input type
   if (isinstance(submesh,SMESH._objref_SMESH_Group) or
-      isinstance(submesh,SMESH._objref_SMESH_GroupOnGeom)):
+      isinstance(submesh,SMESH._objref_SMESH_GroupOnGeom) or
+      isinstance(submesh,SMESH._objref_SMESH_GroupOnFilter)):
     elementsList = iter(submesh.GetIDs())
     n_elements = len(submesh.GetIDs())
     maxElement = max(submesh.GetIDs())
@@ -77,7 +78,7 @@ def submeshToPFLOTRAN(submesh, submeshName, activeFolder, meshFile=None, outputF
       if outputFileFormat == 1: #HDF5
         print('Not implemented')
       elif outputFileFormat == 2: #ASCII
-        surfaceSubmeshUnstructuredExplicit(submesh, elementsList, n_elements, activeFolder+submeshName+'.ex')
+        surfaceSubmeshUnstructuredExplicit(submesh, elementsList, n_elements,  activeFolder+submeshName+'.ex')
       return 
     
   return
@@ -89,7 +90,6 @@ def volumeSubmeshAsRegionASCII(submesh, elementsList, n_element, ASCIIOutput, na
    
   #open pflotran file
   out = open(ASCIIOutput, 'w')
-  
   
   #We need correspondance between mesh element in salome and in HDF5
   fatherMeshCells = submesh.GetMesh().GetElementsByType(VOLUME)
@@ -224,28 +224,28 @@ def volumeSubmeshAsRegionHDF5(submesh, elementsList, maxElement, n_elements, PFl
 
 
 
-def surfaceSubmeshUnstructuredExplicit(submesh, corresp, folder, name=None):
+def surfaceSubmeshUnstructuredExplicit(submesh, elementList, n_elements, name=None):
+  import salome
+  from SMESH import VOLUME
+  
   if not name:
     name = salome.smesh.smeshBuilder.GetName(submesh)
-    
-  import salome
+  
   out = open(name, 'w')
-  try:
-    IDList = submesh.GetElementsId()
-  except:
-    IDList = submesh.GetListOfID()
-  out.write("CONNECTIONS {}\n".format(len(IDList)))
+  out.write("CONNECTIONS {}\n".format(n_elements))
   
   smesh = salome.smesh.smeshBuilder.New()
-  motherMeshType = submesh.GetMesh().GetTypes()[-1]
-  motherMesh = smesh.Mesh(submesh.GetMesh()) #Mesh object
+  fatherMesh = smesh.Mesh(submesh.GetMesh()) #Mesh object
+  fatherMeshCells = fatherMesh.GetElementsByType(VOLUME)
+  #We need correspondance between mesh element in salome and in HDF5
+  d = {fatherMeshCells[i]: i+1 for i in range(len(fatherMeshCells))}
   
-  for faceId in IDList:
-    nodes = motherMesh.GetElemNodes(faceId)
-    elementList = motherMesh.GetElementsByNodes(nodes, motherMeshType)
-    out.write("{} ".format(corresp[elementList[0]]))
-    center = motherMesh.BaryCenter(faceId)
-    area = motherMesh.GetArea(faceId)
+  for faceId in elementList:
+    nodes = fatherMesh.GetElemNodes(faceId)
+    element = fatherMesh.GetElementsByNodes(nodes, VOLUME)[0]
+    out.write("{} ".format(d[element]))
+    center = fatherMesh.BaryCenter(faceId)
+    area = fatherMesh.GetArea(faceId)
     for x in center:
       out.write("{} ".format(x))
     out.write("{}\n".format(area))

@@ -321,7 +321,7 @@ def PFLOTRANMeshExport(context):
     
     #Export selected meshes
     print ("Export mesh: " + meshToExport.GetName())
-    exportMesh.meshToPFLOTRAN(meshToExport, folder, outFormat, gridFormat, name)
+    corresp = exportMesh.meshToPFLOTRAN(meshToExport, folder, outFormat, gridFormat, name)
     
     #retrieve submesh
     if groupsToExport:

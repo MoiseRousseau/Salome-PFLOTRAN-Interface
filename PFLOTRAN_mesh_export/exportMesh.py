@@ -454,6 +454,7 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput):
     sys.exit("2D mesh not implemented yet")
 
   #CELLS part
+  print("Write cell ids, center and volume")
   n_elements = len(mesh.GetElementsByType(meshType))
   out.write("CELLS %s\n" %n_elements)
   count = 1
@@ -482,10 +483,17 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput):
     connectionType = EDGE
     sys.exit("EDGE connection not supported yet")
     
+  print("Build connections between cells")
   sharedFaceDict = {}
   faceArea = {}
+  faceCenter = {}
   volIDs = mesh.GetElementsByType( VOLUME )
+  count_bar = 0
+  n_elements = len(volIDs)
   for v in volIDs:
+    count_bar += 1
+    if not count_bar % 100:
+      progress_bar(count_bar, n_elements, barLength=50)
     nbF = mesh.ElemNbFaces( v )
     for f in range(0,nbF):
       vFNodes = mesh.GetElemFaceNodes( v, f )
@@ -495,18 +503,25 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput):
       else:
         sharedFaceDict[ dictKey ].append( v )
         faceArea[tuple(sharedFaceDict[ dictKey ])] = computeArea(vFNodes)
-        
+        faceCenter[tuple(sharedFaceDict[ dictKey ])] = computeCenter(vFNodes)
+  
+  print('\nWrite connections')
+  num_connection = 0
+  for v in sharedFaceDict.values():
+    if len(v) == 2: num_connection += 1
+  out.write("CONNECTIONS {}\n".format(num_connection)) 
+       
   for f,v in sharedFaceDict.items():
     if len(v) == 2:
       area = faceArea[tuple(v)]
-      center = computeCenter(f)
-      out.write(str(v[0])+ ' ' + str(v[1]) + ' ')
+      center = faceCenter[tuple(v)]
+      out.write(str(corresp[v[0]])+ ' ' + str(corresp[v[1]]) + ' ')
       for x in center: out.write(str(x) + ' ')
       out.write(str(area) + '\n')
    
   out.close()
 
-  return corresp
+  return 
 
 
 
