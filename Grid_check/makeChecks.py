@@ -26,6 +26,7 @@ def checkNonOrthogonality(context):
   importlib.reload(UI_makeChecks)
   importlib.reload(checkClass)
   import SMESH
+  from salome.smesh import smeshBuilder
   
   class ExportDialog(QDialog):
     
