@@ -28,8 +28,11 @@ if ACTIVATE_PLUGIN:
   import sys
 
   #common to all plugin in .config/salome/Plugins folder
-  user = os.getlogin()
-  path = '/home/%s/.config/salome/Plugins/' %(user)
+  try:
+    user = '/home/' + os.getlogin()
+  except:
+    user = os.environ['HOME']
+  path = '%s/.config/salome/Plugins/' %(user)
   
   #load Export plugin
   sys.path.append(path+'PFLOTRAN_mesh_export/') #path to plugin component for importation
