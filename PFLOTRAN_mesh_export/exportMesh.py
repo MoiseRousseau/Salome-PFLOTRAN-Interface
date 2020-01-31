@@ -91,6 +91,7 @@ def meshToPFLOTRAN(meshToExport, activeFolder, outputFileFormat, outputMeshForma
     if outputMeshFormat == 1: #Implicit
       meshToPFLOTRANUntructuredASCII(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput)
     elif outputMeshFormat == 2: #Explicit
+      meshToXDMFWhenExplicit(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput)
       meshToPFLOTRANUnstructuredExplicitASCII(meshToExport, PFlotranOutput)
       
   elif outputFileFormat == 1: #HDF5
@@ -528,7 +529,66 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput):
 def meshToPFLOTRANUnstructuredExplicitHDF5(mesh, PFlotranOutput):
   raise RuntimeError('HDF5 unstructureed explicit seems not to be implemented in PFLOTRAN')
   return
+  
 
 
+def meshToXDMFWhenExplicit(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFLOTRANOutput):
+  import h5py
+  import numpy
+  print("Create XDMF file for visualisation")
+  
+  prefix = PFLOTRANOutput.split('.')[:-1]
+  PFLOTRANOutput = ''
+  for x in prefix:
+    PFLOTRANOutput += x
+  PFLOTRANOutput += "_Domain.h5"
+  
+  #open pflotran output file
+  out = h5py.File(PFLOTRANOutput, mode='w')
+  
+  #hdf5 node coordinates
+  print('\nCreating Domain/Vertices dataset: ')
+  vertexArray = numpy.zeros((n_nodes, 3), dtype='f8')
+  for i in nodesList:
+    X,Y,Z = meshToExport.GetNodeXYZ(i)
+    vertexArray[i-1,0] = X
+    vertexArray[i-1,1] = Y
+    vertexArray[i-1,2] = Z
+  out.create_dataset('Domain/Vertices', data=vertexArray)
+  
+  #HDF5 cells
+  #initialise array
+  #integer length
+  print('\nCreating Domain/Cells dataset: ')
+  int_type = numpy.log(n_nodes)/numpy.log(2)/8
+  if int_type <= 1: int_type = 'u1'
+  elif int_type <= 2: int_type = 'u2'
+  elif int_type <= 4: int_type = 'u4'
+  else: int_type = 'u8'
+  
+  temp_list = []
+
+  for c in elementsList:
+    temp_list.append(16) #we say it is a polyhedron
+    nbF = meshToExport.ElemNbFaces( c )
+    temp_list.append(nbF) #write number of face 
+    for f in range(0,nbF):
+      vFNodes = meshToExport.GetElemFaceNodes( c, f )
+      temp_list.append(len(vFNodes)) #write face length
+      temp_list.extend([x-1 for x in vFNodes])
+        
+  out.create_dataset('Domain/Cells', data=numpy.array(temp_list, dtype=int_type))
+  
+  #store number of cells
+  out.create_dataset('Domain/Cell_number', data=numpy.array([n_elements], dtype=int_type))
+  
+  out.close()
+  
+  return
+  
+  
+  
+
+  
 
 
