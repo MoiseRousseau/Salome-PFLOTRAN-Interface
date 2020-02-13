@@ -438,10 +438,18 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput):
     return abs(area)
      
   def computeCenter(nodesId):
+    #https://stackoverflow.com/questions/18305712/how-to-compute-the-center-of-a-polygon-in-2d-and-3d-space
     center = np.zeros((3), dtype='f8')
-    for node in nodesId:
-      center += mesh.GetNodeXYZ(node)
-    center /= len(nodesId)
+    sL = 0
+    for i in range(len(nodesId)):
+      x0,y0,z0 = mesh.GetNodeXYZ(nodesId[i])
+      x1,y1,z1 = mesh.GetNodeXYZ(nodesId[i])
+      L = ((x1 - x0)**2 + (y1 - y0)**2 + (z1 - z0)**2) ** 0.5
+      center[0] += (x0 + x1)/2 * L
+      center[1] += (y0 + y1)/2 * L
+      center[2] += (z0 + z1)/2 * L
+      sL += L
+    center /= sL
     return center
   
   #open pflotran output file
