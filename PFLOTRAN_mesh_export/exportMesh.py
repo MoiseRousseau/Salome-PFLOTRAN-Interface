@@ -442,7 +442,7 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput):
     center = np.zeros((3), dtype='f8')
     sL = 0
     for i in range(len(nodesId)):
-      x0,y0,z0 = mesh.GetNodeXYZ(nodesId[i])
+      x0,y0,z0 = mesh.GetNodeXYZ(nodesId[i-1])
       x1,y1,z1 = mesh.GetNodeXYZ(nodesId[i])
       L = ((x1 - x0)**2 + (y1 - y0)**2 + (z1 - z0)**2) ** 0.5
       center[0] += (x0 + x1)/2 * L
