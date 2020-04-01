@@ -7,7 +7,7 @@ SIMULATION
       MODE RICHARDS
     /
     SUBSURFACE_TRANSPORT transport
-      GLOBAL_IMPLICIT
+      MODE GIRT
     /
   /
 END
@@ -33,12 +33,8 @@ END
 
 #=========================== discretization ===================================
 GRID
-  TYPE STRUCTURED mesh_ref_ugi.h5
-  NXYZ 40 40 40
-  BOUNDS
-    0 0 0
-    1000 1000 200
-  /
+  TYPE UNSTRUCTURED_EXPLICIT exp_grid.uge
+  UPWIND_FRACTION_METHOD ABSOLUTE_DISTANCE
 END
 
 
@@ -93,23 +89,38 @@ REGION all
 END
 
 REGION injection
-  COORDINATE 112.5 112.5 22.5
+  COORDINATES
+    110. 110. 22.
+    115. 115. 23.
+  /
 END
 
 REGION extraction
-  COORDINATE 887.5 887.5 177.5
+  COORDINATES
+    885. 885. 177.
+    890. 890. 178.
+  /
 END
 
 REGION obs1
-  COORDINATE 362.5 612.5 82.5
+  COORDINATES
+    360. 610. 82.
+    365. 615. 83.
+  /
 END
 
 REGION obs2
-  COORDINATE 762.5 512.5 112.5
+  COORDINATES
+    760. 510. 112.
+    765. 515. 113.
+  /
 END
 
 REGION obs3
-  COORDINATE 487.5 662.5 172.5
+  COORDINATES
+    485. 660. 172.
+    490. 665. 173.
+  /
 END
 
 

@@ -41,8 +41,8 @@ geompy.addToStudy( OZ, 'OZ' )
 geompy.addToStudy( domain, 'domain' )
 geompy.addToStudy( injector, 'injector' )
 geompy.addToStudy( extrator, 'extrator' )
-geompy.addToStudy( obs3, 'obs1' )
-geompy.addToStudy( obs3, 'obs2' )
+geompy.addToStudy( obs1, 'obs1' )
+geompy.addToStudy( obs2, 'obs2' )
 geompy.addToStudy( obs3, 'obs3' )
 
 ###

@@ -7,7 +7,7 @@ SIMULATION
       MODE RICHARDS
     /
     SUBSURFACE_TRANSPORT transport
-      GLOBAL_IMPLICIT
+      MODE GIRT
     /
   /
 END
@@ -33,7 +33,12 @@ END
 
 #=========================== discretization ===================================
 GRID
-  TYPE UNSTRUCTURED imp_grid.h5
+  TYPE STRUCTURED 
+  NXYZ 40 40 40
+  BOUNDS
+    0 0 0
+    1000 1000 200
+  /
 END
 
 

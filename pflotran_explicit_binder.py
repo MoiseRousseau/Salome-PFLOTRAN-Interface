@@ -86,14 +86,33 @@ def writeAttribute(f, attr, pflotranOut, nCells, timeStr):
 def writeEnd(f):
   f.write("</Grid>\n</Domain>\n</Xdmf>")
   return
+
+
+  
+#def computeCellVelocity(faceVelocity, ):
+#  #we need face velocity, cell topology and that's all
+#  
+#  return velocity
+#  
+#def computeVelocityAtCenter(pflotranOut,domain):
+#  f = h5py.File(pflotranOut, 'r')
+#  timeStep = [x for x in f.keys() if "Time" in x]
+#  dataset = [x for x in f[timeStep[0]].keys()]
+#  f.close()
+#  if "Velocity" not in dataset:
+#    return
+#  
+#  return
   
   
 if __name__ == '__main__':
   if len(sys.argv) != 3:
     print("Utilisation:")
-    print("python3 pflotran_explicit_binder.py [name_of_PFLOTRAN_output] [name_of_Salome_domain_h5_file]\n")
-  bindExplicit(sys.argv[1], sys.argv[2])
-  print("END")
+    print("{} [name_of_PFLOTRAN_output] [name_of_Salome_domain_h5_file]\n".format(sys.argv[0]))
+  else:  
+  #computeVelocityAtCenter(sys.argv[1], sys.argv[2])
+    bindExplicit(sys.argv[1], sys.argv[2])
+    print("END")
   
 
   

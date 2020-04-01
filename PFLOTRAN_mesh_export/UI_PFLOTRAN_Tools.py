@@ -141,14 +141,14 @@ class Ui_Dialog(object):
     self.gridLayout_main.addLayout(self.gridLayout_output, 5, 0)
     
     #autocompletion
-    self.gridLayout_autocompletion = QtWidgets.QGridLayout(Dialog)
-    self.gridLayout_autocompletion.setObjectName("gridLayout_autocompletion")
+    self.gridLayout_forceFullCalculation = QtWidgets.QGridLayout(Dialog)
+    self.gridLayout_forceFullCalculation.setObjectName("gridLayout_forceFullCalculation")
     #enable
-    self.cb_enableAutocompletion = QtWidgets.QCheckBox(Dialog)
-    self.cb_enableAutocompletion.setObjectName("cb_enableAutocompletion")
-    self.gridLayout_autocompletion.addWidget(self.cb_enableAutocompletion, 0, 0)
+    self.cb_forceFullCalculation = QtWidgets.QCheckBox(Dialog)
+    self.cb_forceFullCalculation.setObjectName("cb_forceFullCalculation")
+    self.gridLayout_forceFullCalculation.addWidget(self.cb_forceFullCalculation, 0, 0)
     #addlayout
-    self.gridLayout_main.addLayout(self.gridLayout_autocompletion, 6, 0)
+    self.gridLayout_main.addLayout(self.gridLayout_forceFullCalculation, 6, 0)
     
     #ok and cancel button
     self.splitter = QtWidgets.QSplitter(Dialog)
@@ -180,7 +180,7 @@ class Ui_Dialog(object):
     self.table_header_0.setText(_translate("Dialog", "Available groups"))
     self.label_outputFormat.setText(_translate("Dialog", "Output format:"))
     self.label_gridFormat.setText(_translate("Dialog", "Grid format:"))
-    self.cb_enableAutocompletion.setText(_translate("Dialog", "Enable autocompletion of PFLOTRAN input file"))
+    self.cb_forceFullCalculation.setText(_translate("Dialog", "Force full calculation for element's node order"))
     #help
     self.pb_help.setText(_translate("Dialog", "Help"))
   

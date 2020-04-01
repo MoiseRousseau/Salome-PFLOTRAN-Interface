@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
 # This library is free software; you can redistribute it and/or
@@ -15,28 +15,30 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 #
-# Author : Moise Rousseau (2019), email at moise.rousseau@polymtl.ca
+# Author : Moise Rousseau (2020), email at moise.rousseau@polymtl.ca
 
+from PyQt5 import QtCore
+import sys
+import os
+import importlib
 
+#import plugin component
+import exportMesh
+import exportSubMesh
+import UI_PFLOTRAN_Tools
+#reload it to make modification reloaded
+importlib.reload(exportMesh)
+importlib.reload(exportSubMesh)
+importlib.reload(UI_PFLOTRAN_Tools)
+
+#import salome stuff
+from salome.smesh import smeshBuilder
+from qtsalome import QDialog, QMessageBox, QFileDialog, QTableWidgetItem
+import SMESH
+import salome
 
 
 def PFLOTRANMeshExport(context):
-  from PyQt5 import QtCore
-  import sys
-  import os
-  import importlib
-  #import plugin component
-  import exportMesh
-  import exportSubMesh
-  import UI_PFLOTRAN_Tools
-  #reload it to make modification reloaded
-  importlib.reload(exportMesh)
-  importlib.reload(exportSubMesh)
-  importlib.reload(UI_PFLOTRAN_Tools)
-  from salome.gui import helper
-  from salome.smesh import smeshBuilder
-  import SMESH
-
 
   class ExportDialog(QDialog):
     
@@ -69,6 +71,7 @@ def PFLOTRANMeshExport(context):
       self.ui.pb_okCancel.accepted.connect(self.checkValue)
       self.ui.rb_outputFormat[0].toggled.connect(lambda:self.excludeExplicit(self.ui.rb_outputFormat))
       self.ui.rb_outputFormat[1].toggled.connect(lambda:self.excludeExplicit(self.ui.rb_outputFormat))
+      self.ui.rb_gridFormat[0].toggled.connect(self.excludeFullCalculation)
       #self.ui.pb_OutputFile.clicked.connect(self.setOutputFile)
       #self.ui.pb_help.clicked.connect(self.helpMessage)
       
@@ -151,6 +154,7 @@ def PFLOTRANMeshExport(context):
       elif self.selectedMesh:
         groups = []
         for x in self.selectedMesh.GetGroups():
+          if not x.GetTypes(): continue
           if (x.GetTypes()[0] == SMESH.VOLUME or x.GetTypes()[0] == SMESH.FACE):
             groups.append(x)
         self.ui.table_availableMesh.setRowCount(len(groups))
@@ -204,6 +208,13 @@ def PFLOTRANMeshExport(context):
         self.ui.rb_gridFormat[1].setCheckable(True)
       return
       
+    def excludeFullCalculation(self):
+      if self.ui.rb_gridFormat[1].isChecked():
+        self.ui.cb_forceFullCalculation.setCheckable(False)
+      else:
+        self.ui.cb_forceFullCalculation.setCheckable(True)
+      return
+     
     def helpMessage(self):
       import subprocess
       subprocess.Popen(['firefox'], shell=False)
@@ -318,10 +329,16 @@ def PFLOTRANMeshExport(context):
           res = window.printMessageYesNo('Face group in HDF5 output can not be read by PFLOTRAN since it is not implemented. %s group will be exported in ASCII under the name %s.ss. If this file exist, it will be overwrite. Continue ?' %(groupNameInSalome, groupNameInOut))
           if not res: return
         groupsToExport.append([group[0], groupNameInOut])
+    if window.ui.cb_forceFullCalculation.isChecked() and gridFormat == IMPLICIT:
+      forceFullCalculation = True
+    else: forceFullCalculation = False
     
     #Export selected meshes
     print ("Export mesh: " + meshToExport.GetName())
-    corresp = exportMesh.meshToPFLOTRAN(meshToExport, folder, outFormat, gridFormat, name)
+    success = exportMesh.meshToPFLOTRAN(meshToExport, folder, outFormat, gridFormat, name, forceFullCalculation)
+    if not success: 
+      print("Some error happen and the mesh have not been exported correctly...")
+      return
     
     #retrieve submesh
     if groupsToExport:
@@ -337,8 +354,4 @@ def PFLOTRANMeshExport(context):
 
   return
   
-  
-salome_pluginsmanager.AddFunction('Salome-PFLOTRAN-Interface/Export mesh to PFLOTRAN',
-                                  'Export mesh and groups to PFLOTRAN readable format',
-                                  PFLOTRANMeshExport)
 

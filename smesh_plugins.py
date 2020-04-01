@@ -19,6 +19,7 @@
 # Author : Moise Rousseau (2019), email at moise.rousseau@polymtl.ca
 
 import salome_pluginsmanager
+import importlib
 
 ACTIVATE_PLUGIN = True
 
@@ -34,12 +35,41 @@ if ACTIVATE_PLUGIN:
     user = os.environ['HOME']
   path = '%s/.config/salome/Plugins/' %(user)
   
-  #load Export plugin
-  sys.path.append(path+'PFLOTRAN_mesh_export/') #path to plugin component for importation
-  exec(open(path + 'PFLOTRAN_mesh_export/PFLOTRAN_Tools.py').read()) #the plugin
-  #load grid check
-  sys.path.append(path+'Grid_check/') #path to plugin component for importation
-  exec(open(path + 'Grid_check/makeChecks.py').read()) #the plugin
   
-  #if you have other plugin to import, add it here
-  #exec(open(path + 'PFLOTRAN_EDZ_perm_dataset_creator/EDZ_permeability_dataset.py').read())
+  # ==== PFLOTRAN PLUGINS ====
+  #common path
+  folder = 'PFLOTRAN-Salome-Interface/'
+  sys.path.append(path+folder)
+  common_folder = "Salome-PFLOTRAN-Interface/"
+  
+  #load Export plugin 
+  sys.path.append(path+folder+"PFLOTRAN_mesh_export/")
+  import PFLOTRAN_Tools
+  importlib.reload(PFLOTRAN_Tools)
+  salome_pluginsmanager.AddFunction(common_folder + 'Export mesh to PFLOTRAN',
+                                    'Export mesh and groups to PFLOTRAN readable format',
+                                     PFLOTRAN_Tools.PFLOTRANMeshExport)
+  
+  #load grid check
+  sys.path.append(path+folder+'Grid_check/') #path to plugin component for importation
+  import makeChecks
+  salome_pluginsmanager.AddFunction('Salome-PFLOTRAN-Interface/Check mesh quality',
+                                    'Compute statistics for mesh non orthogonality and skewness',
+                                    makeChecks.checkNonOrthogonality)
+  
+  #load integral flux
+  sys.path.append(path+folder+'PFLOTRAN_integral_flux/')
+  import Integral_flux  
+  importlib.reload(Integral_flux)
+  salome_pluginsmanager.AddFunction(common_folder + 'Integral Flux',
+                                    'Export surface mesh for integral flux',
+                                     Integral_flux.integralFluxExport)
+  
+  #load EDZ permeability plugin
+  sys.path.append(path+folder+'PFLOTRAN_EDZ_perm_dataset_creator/')
+  import EDZ_permeability_dataset
+  importlib.reload(EDZ_permeability_dataset)
+  salome_pluginsmanager.AddFunction(common_folder + 'Create permeability dataset',
+                                    'Create a permeability dataset corresponding to a EDZ',
+                                     EDZ_permeability_dataset.EDZPermeabilityDataset)
+

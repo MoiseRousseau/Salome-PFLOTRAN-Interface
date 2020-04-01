@@ -92,6 +92,7 @@ class MeshQualityCheck:
     bC2 = self.mesh.BaryCenter(v_ar[1])
     p2 = np.array(bC2, dtype = 'f8')
     line = p2 - p1
+    #print(p2,p1)
     centerDistance = np.sqrt(np.dot(line, line))
     return [line, centerDistance]
 
@@ -100,19 +101,32 @@ class MeshQualityCheck:
     p2 = np.array(faceCoord[1], dtype='f8')
     p3 = np.array(faceCoord[2], dtype='f8')
     v1 = p2 - p1
+    v1 /= np.sqrt(np.dot(v1,v1))
     v2 = p3 - p1
+    v2 /= np.sqrt(np.dot(v2,v2))
     v3 = np.cross(v1, v2)
+    i = 3
+    while np.dot(v3,v3) < 1e-3:
+      if i == len(faceCoord): break
+      pi = np.array(faceCoord[i], dtype='f8')
+      v2 = pi - p1
+      v2 /= np.sqrt(np.dot(v2,v2))
+      v3 = np.cross(v1, v2)
+      i += 1
     return v3
     
   def getAngle(self, v1, v2):
     tol = 1e-6
     ang = np.dot(v1,v2)/np.sqrt(np.dot(v1,v1)*np.dot(v2,v2))
+    #print(v1,v2,ang)
     if ang > 1-tol:
       return 0
     elif ang < -1+tol:
       return 0
     ang = np.arccos(ang)
+    #print(ang)
     ang = ang/np.pi*180
+    #print(ang)
     if ang > 90: ang = 180 - ang
     return ang
 
@@ -217,45 +231,10 @@ class MeshQualityCheck:
           inters[inter] += 1
           break
     return inters
-    
-  
-  """  
-  def checkMeshParallel(self):
-    import multiprocessing
-    pool = multiprocessing.Pool()
-    arg = [(k,v,self.getFaceCoord(k)) for k,v in self.sharedFaceDict.items() if len(v) == 2]
-    res = pool.map(self.checkFace, arg)
-    self.nonOrthogonalVolPairs = {arg[i][1]:res[i][0] for i in range(len(arg))}
-    self.SkewVolPairs = {arg[i][1]:res[i][1] for i in range(len(arg))}
-    return
-    
-  def getFaceCoord(self,faceIdList):
-    return [self.mesh.GetNodeXYZ( x ) for x in faceIdList ]
-    
-  def checkFace(self, face):
-    k,v, faceCoord = face
-    # k is the list of face node Ids for internal faces if corresponding volume vector consists of 2 elements 
-    # calculation line connecting volumes' centers of mass and its distance
-    COMsLine, centerDistance = self.COMsLineDist(v)
-    # convert string of face node Ids k to list of corresp coordinates
-    if( self.nonOrthogonalityCheck ):
-    # calculating face normal direction
-      fNorm = self.faceNormalDir(faceCoord)
-    #calculating the angle between faceNormal and com-connecting line
-      a = self.checkNonOrth(COMsLine, fNorm, v)
-    if( self.skewnessCheck ):
-    #calculation skewness as the minimum distance between the com-connecting line and com of the face
-      pFCom = self.COMofFace(faceCoord, nbNodesOfFace)
-      b = self.checkSkewness(pFCom, COMsLine, centerDistance, v)
-    return (a,b)
-  """ 
   
     
   def checkMesh(self):
-    #use multiprocess for more than 10000 faces
-    #if self.nbInternalFaces > 10000:
-    #  print(self.outputPreSting + "Evaluate quality in parallel")
-    #  self.checkMeshParallel()
+    #TODO Convert this in cython ??
     
     #else:
     if(self.progressOutput):

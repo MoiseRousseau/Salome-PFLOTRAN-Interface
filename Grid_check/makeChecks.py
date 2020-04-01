@@ -18,15 +18,19 @@
 # Author : Moise Rousseau (2019), email at moise.rousseau@polymtl.ca
 
 
+import UI_makeChecks
+import checkClass
+import importlib
+importlib.reload(UI_makeChecks)
+importlib.reload(checkClass)
+
+import SMESH
+from PyQt5 import QtCore, QtGui, QtWidgets
+from salome.smesh import smeshBuilder
+from qtsalome import QDialog
+
 
 def checkNonOrthogonality(context):
-  import UI_makeChecks
-  import checkClass
-  import importlib
-  importlib.reload(UI_makeChecks)
-  importlib.reload(checkClass)
-  import SMESH
-  from salome.smesh import smeshBuilder
   
   class ExportDialog(QDialog):
     
@@ -111,11 +115,5 @@ def checkNonOrthogonality(context):
   result = window.result()
     
   return
-  
-  
-salome_pluginsmanager.AddFunction('Salome-PFLOTRAN-Interface/Check mesh quality',
-                                  'Compute statistics for mesh non orthogonality and skewness',
-                                  checkNonOrthogonality)
-
     
 
