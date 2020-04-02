@@ -19,8 +19,8 @@ This plugin was tested on the latest release of Salome (which is up to date 9.4.
 
 Installation of the plugin is done in three steps:
 1. Download the repository in your machine
-2. Unzip it into the folder `$HOME/.config/salome/Plugins/`
-3. You are ready to go (or you should have)
+2. Unzip it and copy the content of the folder `Salome-PFLOTRAN-Interface` into `$HOME/.config/salome/Plugins/`
+3. You are ready to go (or you should have been)
 
 The plugin should work as is for ASCII output. However, if you want to use the HDF5 file output (which is a better choice at my thought - faster and less hard drive space), you may have to install the h5py module within Salome:
 

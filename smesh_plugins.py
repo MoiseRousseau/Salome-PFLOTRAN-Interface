@@ -38,12 +38,13 @@ if ACTIVATE_PLUGIN:
   
   # ==== PFLOTRAN PLUGINS ====
   #common path
-  folder = 'PFLOTRAN-Salome-Interface/'
-  sys.path.append(path+folder)
+  sys.path.append(path)
+  
+  #folder in Salome GUI
   common_folder = "Salome-PFLOTRAN-Interface/"
   
   #load Export plugin 
-  sys.path.append(path+folder+"PFLOTRAN_mesh_export/")
+  sys.path.append(path+"PFLOTRAN_mesh_export/")
   import PFLOTRAN_Tools
   importlib.reload(PFLOTRAN_Tools)
   salome_pluginsmanager.AddFunction(common_folder + 'Export mesh to PFLOTRAN',
@@ -51,14 +52,14 @@ if ACTIVATE_PLUGIN:
                                      PFLOTRAN_Tools.PFLOTRANMeshExport)
   
   #load grid check
-  sys.path.append(path+folder+'Grid_check/') #path to plugin component for importation
+  sys.path.append(path+'Grid_check/') #path to plugin component for importation
   import makeChecks
   salome_pluginsmanager.AddFunction('Salome-PFLOTRAN-Interface/Check mesh quality',
                                     'Compute statistics for mesh non orthogonality and skewness',
                                     makeChecks.checkNonOrthogonality)
   
   #load integral flux
-  sys.path.append(path+folder+'PFLOTRAN_integral_flux/')
+  sys.path.append(path+'PFLOTRAN_integral_flux/')
   import Integral_flux  
   importlib.reload(Integral_flux)
   salome_pluginsmanager.AddFunction(common_folder + 'Integral Flux',
@@ -66,10 +67,12 @@ if ACTIVATE_PLUGIN:
                                      Integral_flux.integralFluxExport)
   
   #load EDZ permeability plugin
-  sys.path.append(path+folder+'PFLOTRAN_EDZ_perm_dataset_creator/')
+  sys.path.append(path+'PFLOTRAN_EDZ_perm_dataset_creator/')
   import EDZ_permeability_dataset
   importlib.reload(EDZ_permeability_dataset)
   salome_pluginsmanager.AddFunction(common_folder + 'Create permeability dataset',
                                     'Create a permeability dataset corresponding to a EDZ',
                                      EDZ_permeability_dataset.EDZPermeabilityDataset)
+                                     
+  # ===== ADD OTHER PLUGIN BELOW ====
 
