@@ -1,28 +1,32 @@
 # Salome PFLOTRAN Interface
 
-Interface the Salome CAD software (https://www.salome-platform.org/) with the finite volume PFLOTRAN reactive transport subsurface simulator (https://www.pflotran.org/). This interface take the form of a Python plugin in Salome software (write in Python 3) and export mesh and groups created by Salome mesh module into a readable format by PFLOTRAN code. Various PFLOTRAN input format are implemented (ASCII and HDF5 file and unstructured implicit/explicit grid description). This plugin was developped to facilitate simulation of several phenomenons in complex geometries which can not be generated and/or meshed within PFLOTRAN. 
+Interface the Salome CAD software (https://www.salome-platform.org/) with the finite volume PFLOTRAN reactive transport subsurface simulator (https://www.pflotran.org/). This interface take the form of various Python scripts, and define Salome plugins which are callable from the GUI. This plugin was developed to facilitate simulation of several phenomenons in complex geometries which can not be generated and/or meshed within PFLOTRAN. It is intended to be used for engineering purpose.
+
 
 ## Features
-* Export 3D meshes created within Salome mesh module in a readable format by PFLOTRAN (ASCII or HDF5).
-* Unstructured implicit / explicit grid type format
-* Around 400,000 elements per minutes on single thread and on a Intel Core i5 5300U.
-* Export 3D groups (parts of the principal mesh) to define region in PFLOTRAN.
-* Export 2D groups in ASCII format to define boundary / initial condition (HDF5 format not implemented in PFLOTRAN yet).
-* Mesh quality assessment: non-orthogonality and skewness
+*  Export mesh and groups created by Salome mesh module into a readable format by PFLOTRAN code. Various PFLOTRAN input format are implemented (ASCII and HDF5 file and unstructured implicit/explicit grid description - polyhedral to come). Export directly 3D and 2D groups as region in PFLOTRAN to easily define material repartition and boundary condition.
+* Mesh quality assessment: non-orthogonality and skewness check (experimental and slow).
+* INTEGRAL_FLUX card creator. Export 2D groups in a readily file readable by PFLOTRAN in various format: by coordinates and normal, vertices (for implicit unstructured grid only) and by cell ids.
+* Permeability dataset creator for excavated damaged zone. Given a mesh or a mesh group and a surface, compute for every cell in the considered mesh or group the distance to the considered surface and the unit vector direction, and store it into a HDF5 file. Create afterward a cell indexed dataset of permeability according to [Mourzenko et al. (2012)](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.86.026312).
+* Useful examples in the Example folder, to have a quick look at what Salome is capable of.
+
 
 ## Getting Started
 
-This plugin was tested on the latest release of Salome (which is up to date 9.4.0) running on Ubuntu 19.10. Nevertheles, it should work for newer release of Salome and for other platform. Note Salome switch to Python 3 since version 9.2.0 (February 2019) and consequently, the plugin could not compatible with older Salome version than 9.2.0.
+This plugin was tested on the latest release of Salome (which is up to date 9.4.0) running on Ubuntu 19.10. Nevertheless, it should work for newer release of Salome and for other platform. Note Salome switch to Python 3 since version 9.2.0 (February 2019) and consequently, the plugin could not compatible with older Salome version than 9.2.0.
 
-### Prerequisites
+### Installation
 
-The plugin should work as is for ASCII output. Yet, if you want to use the HDF5 file output (which is a better choice at my thought - faster and less hard drive space), you may have to install the h5py module within Salome:
+Installation of the plugin is done in three steps:
+1. Download the repository in your machine
+2. Unzip it into the folder `$HOME/.config/salome/Plugins/`
+3. You are ready to go (or you should have)
+
+The plugin should work as is for ASCII output. However, if you want to use the HDF5 file output (which is a better choice at my thought - faster and less hard drive space), you may have to install the h5py module within Salome:
+
 1. Go to your Salome installation folder and open a terminal.
-2. Make sure you have an C++ compiler installed, such as gcc (https://gcc.gnu.org/). If not, install it (or update it) with the command: 
-```
-sudo apt-get install gcc
-```
-3. Make a symbolic link from the Salome Python folder to the ```/usr/lib/``` directory. This step is needed for ```gcc``` to compile ```h5py``` source (Remplace ```$SalomeRootFolder``` by the Salome path): 
+2. Make sure you have an C++ compiler installed, such as GCC (https://gcc.gnu.org/). If not, install it (or update it) with the command ```sudo apt-get install gcc```.
+3. Make a symbolic link from the Salome Python folder to the ```/usr/lib/``` directory. This step is needed for GCC to compile Hh5py sources (Remplace ```$SalomeRootFolder``` by your path to Salome): 
 ```
 sudo ln -s $SalomeRootFolder/Python/lib/libpython3.6.so /usr/lib/libpython3.6.so
 ```
@@ -36,43 +40,81 @@ pip3 install h5py
 ```
 8. h5py is now installed. You can test it by launching Salome and typing the following command in the TUI: ```import h5py```. This command should not return an error.
 
-### Installing
-
-Installation of the plugin is done in three steps:
-1. Download the repository in your machine
-2. Unzip it into the folder `/home/$YOUR_USER_NAME/.config/salome/Plugins/`
-3. You are ready to go
 
 ## Use the plugin
 
-### How to export a mesh
+### Export a mesh
 
 To export meshes from Salome to PFLOTRAN:
 1. Click on `Mesh/SMESH plugins/Salome-PFLOTRAN-Interface/Export mesh to PFLOTRAN`
 2. Select the mesh you want to export by clicking `Select` and select the mesh in Salome object browser
-3. If you want to export group as PFLOTRAN regions, click on the corresponding checkbox and use to +/- pushbutton to add or remove groups. You can provide region name by changing the `Name` cell value
+3. If you want to export group as PFLOTRAN regions, click on the corresponding checkbox and use to +/- push-button to add or remove groups. You can provide region name by changing the `Name` cell value
 4. Select the desired output format and grid format (note explicit grid format with HDF output is not implemented in PFLOTRAN yet).
-5. Provide an ouput file
-6. If you want your PFLOTRAN input file autocompleted with minimum command you need to provide and grid and region already defined, check the corresponding box (not working yet).
-7. Press `OK` to start the exportation
+5. Provide an output file
+6. Press `OK` to start the exportation.
 
-### Note about mesh quality 
+Note: if you use the explicit grid format, the plugin also create another file called `..._Domain.h5`. This is intended to be used with the Python script `pflotran_explicit_binder.py`, and to allow proper visualization of your simulation. 
 
-Free volume meshing (like tetrahedral meshes) are the most convenient way to generate meshes. However, PFLOTRAN use a finite volume discretization and require a orthogonal mesh to be accurante. This mean all the vector linking two adjacent cells need to be normal to the face between those two cells. This condition is not meet when using tetrahedral mesh and can lead to significant error in the final solution.
+### Mesh quality 
 
-Mesh quality can be assessed through the `Salome-PFLOTRAN-Interface/Check mesh quality` function, which computes statistics about mesh non-orthogonality (the angle between the face normal and the two-cells centroid vector) and mesh skewnesss (distance between face centroid and face / the two-cells centroid vector intersection).
+Free volume meshing (like tetrahedral meshes) are the most convenient way to generate meshes. However, PFLOTRAN use a finite volume discretization and require orthogonal mesh to be accurate. This mean all the vector linking two adjacent cells need to be normal to the face between those two cells. This condition is not meet when using tetrahedral mesh and can lead to significant error in the final solution.
 
-### Examples
+Mesh quality can be assessed through the `Salome-PFLOTRAN-Interface/Check mesh quality` function, which computes statistics about mesh non-orthogonality (the angle between the face normal and the two-cells centroïd vector) and mesh skewnesss (distance between face centroid and face / the two-cells centroïd vector intersection). Note this plugin is still experimental (understand here computation are slow, and show some weird results sometimes).
 
-An example Salome study is provided in the folder `Example` which can be loaded using `File / Load Script`. It also contain three PFLOTRAN input files to compare pressure and concentration at three different points and according to three meshes: one generated by PFLOTRAN preprocessor, and the two last using the implicit/explicit export capacity of this plugin. Differences are small.
+### Integral flux
+
+Integral flux are created by the `Salome-PFLOTRAN-Interface/Integral flux function`:
+1. Select the mesh face group where you want to applied the integral flux
+2. Select the output format between the three proposed. I recommend the use of the "Cell Ids" format for faces located between two volumes (i.e. in the model), and "Coordinates and direction" for faces on the boundary. Note I experience some unrecognized faces when running PFLOTRAN with the "Coordinates and direction" and "Vertices" formats.
+3. Select the desired integral flux option (Signed, positive only or absolute flux).
+4. Direction of the flux is determined by the left hand rule. Check "Reverse direction" to reverse the flux direction computation.
+5. Select the output file and click on "Ok".
+6. The integral flux file is created. The integral flux is included in your PFLOTRAN input file with:
+```
+INTEGRAL_FLUX
+  NAME [name_of_the_integral_flux]
+  EXTERNAL_FILE [salome_integral_flux_output]
+END
+```
+
+### Excavated damage zone permeability dataset creator
+
+Permeability dataset are created by the `Salome-PFLOTRAN-Interface/Create permeability dataset`:
+1. Select the mesh you want to assign the permeability dataset.
+2. Select the surface from which distance and unit vector will be computed.
+3. Select the output file
+4. Enter the excavated zone properties: trace length, attenuation length, fracture radius, aperture and anisotropy.
+5. Select the permeability model
+6. Select the equivalent permeability coupling (only Standard - sum of fracture and matrix permeability - is implemented yet).
+7. Enter the matrix permeability and click on "Ok".
+
+The creation of the permeability dataset can be quite long. Salome need to compute for each point in the input mesh the distance to the surface. It can took around 1 hour for approximately 40000 cells.
+
+## Examples
+
+Several example of Salome study is provided in the folder `Example` which can be loaded using `File / Load Script`. A small description is provided below:
+* _compare-struct-unstruct-and-explicit-grid_: Contains three PFLOTRAN input files to compare pressure and concentration at three different points and according to three meshes: one generated by PFLOTRAN preprocessor, and the two last using the implicit/explicit export capacity of this suite of plugins. First load the script `salome_script.py` with Salome, go into the SMESH module and export the `quad_mesh` mesh. Second, run the three PFLOTRAN input files `ref.in`, `exp.in` and `imp.in` (you may probably have to change the name of your exported grids). Then, visualize the results with the Python script `plot_result.py`.
+* _experimental-waste-rock-pile_: This Salome script create a 3D model and its spatial discretization of a experimental waste rock pile with a flow control layer [(Dubuc, 2018)](https://publications.polymtl.ca/3187/). Illustrate the use of the integral flux plugin to assess the amount of water which is diverted by the control layer.
+* _tunnel_: Simple 3D model of a tunnel and the surrounding rock. Can be use as a starting point to create an excavated damaged zone permeability dataset. Starting point because the mesh need to be refined around the tunnel (with the viscous layer option from Salome for example), among other reason.
+* _voronoi-mesh_: Illustrate a Voronoi mesh build as the dual of the tetrahedral mesh. Voronoi meshes can be exported to PFLOTRAN with the explicit format. The Voronoi mesher will be release soon... 
+
+## Limitation
+
+Salome software is not a geomodeler. This means its CAD capability is sometimes not adapted to represent topography or interface between geological layer, and may have some problem to deal with complex geological structure. Yet, for engineering applications like the above example, it should do the trick.
+
 
 ## Troubleshooting
 
-If you got any difficulties in installing or using the plugin, or you would like new features to be implemented, feel free to email me. You could find my contact in header of ```PFLOTRAN_Tools.py``` file.
+If you got any difficulties in installing or using the plugin, or you would like new features to be implemented, feel free to email me. You could find my contact in header of `smesh_plugin.py` file.
 
 ## Authors
 
 * **Moïse Rousseau** - *Initial work*
+
+## Acknownlegment
+
+* **Thomas Pabst** - My PhD supervisor
+* All of you which will use the plugin and give me feedback to improve it
 
 ## License
 
