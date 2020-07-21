@@ -185,7 +185,7 @@ class EDZFractureNetwork:
     testVector2[:,1] = 2
     testVector1 = np.cross(n,testVector1)
     testVector2 = np.cross(n,testVector2)
-    u = np.maximum(testVector1, testVector2)
+    u = np.where(np.linalg.norm(testVector1) > np.linalg.norm(testVector2), testVector1, testVector2)
     u = u/np.linalg.norm(u, axis=1)[:, np.newaxis]
     v = np.cross(n,u) #we have thus u.v = normal
     
