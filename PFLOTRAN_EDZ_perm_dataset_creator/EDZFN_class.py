@@ -38,8 +38,9 @@ class EDZFractureNetwork:
     return
     
   def setAnisotropy(self, K):
-    self.iso = False
-    self.concentrationParameter = K
+    if K > 0:
+      self.iso = False
+      self.concentrationParameter = K
     return
 
   def setEDZModel(self,model):
@@ -72,7 +73,7 @@ class EDZFractureNetwork:
   def getModel(self):
     return self.model
   def getAnisotropy(self):
-    return self.iso
+    return not self.iso #true if aniso, false if isotropic
   def getMatrixCoupling(self):
     return self.matrixCoupling
     
@@ -98,7 +99,9 @@ class EDZFractureNetwork:
   #Mourzencko
   def __MourzenckoPermeabilityIsoReduced__(self,rho_r, a=0.037,b=0.155,rho_cr=2.4):
     #defaut parameter for circular fracture
-    if rho_r < rho_cr:
+    if isinstance(rho_r, np.ndarray):
+      res = np.where(rho_r < rho_cr, 0.0, a*(rho_r-rho_cr)**2/(1+b*(rho_r-rho_cr)))
+    elif rho_r < rho_cr:
       return 0.0 #not percolating
     else:
       res = a*(rho_r-rho_cr)**2/(1+b*(rho_r-rho_cr))
@@ -113,16 +116,12 @@ class EDZFractureNetwork:
   
   #
   def computePermeability(self, distance, normal, makeRotation=True):
-    #angle definition ?
     
-    #Threshold for matrix perm
-    thres = 0.1
     #compute density
     if not self.initialDensity or not self.attenuationLength:
       print('Density function with distance not set')
       raise ValueError('')
     rho = self.initialDensity * np.exp(-distance/self.attenuationLength)
-    #print(rho)
     
     #compute perm
     if not self.radius or not self.aperture:
@@ -146,52 +145,68 @@ class EDZFractureNetwork:
       print('Model non defined')
       return
     
-    if not self.iso:
-      K_r_aniso = self.__AnisotropyMatrix__(self.concentrationParameter)
-      K = K/self.__phi__(self.concentrationParameter, l_r)*K_r_aniso
+    if not self.iso: 
+      Kperp = K/self.__phi__(self.concentrationParameter, l_r) 
+      Kpara = Kperp * self.__psi_para__(self.concentrationParameter)
+      Kperp *= self.__psi_perp__(self.concentrationParameter)
     else:
-      K_r_iso = np.array([[1,0,0],[0,1,0],[0,0,1]], dtype='f8')
-      K = K*K_r_iso
+      #K_r_iso = np.array([[1,0,0],[0,1,0],[0,0,1]], dtype='f8')
+      Kperp = K
+      Kpara = np.copy(K)
     
     if self.matrixCoupling:
       #advanced coupling
       print('Not implemented yet')
       pass
     else: #simple addition
-      K[0,0] += self.permMatrix
-      K[1,1] += self.permMatrix
-      K[2,2] += self.permMatrix
+      Kperp += self.permMatrix
+      Kpara += self.permMatrix
     
     if makeRotation and not self.iso:
-      K = self.__rotatePermeabilityTensor__(K,normal)
+      Kxx, Kxy, Kxz, Kyy, Kyz, Kzz = self.__rotatePermeabilityTensor__(Kperp, Kpara,normal)
+    else:
+      Kxx = Kpara #kxx = kyy
+      Kzz = Kperp
+      Kyy = Kxx
+      Kxy = 0.
+      Kxz = 0.
+      Kyz = 0.
     
-    return K
+    return Kxx, Kxy, Kxz, Kyy, Kyz, Kzz
       
   
   #rotation
-  def __rotatePermeabilityTensor__(self, K, normal_):
-    
+  def __rotatePermeabilityTensor__(self, Kperp, Kpara, normal_):
     #found another vector perpendicular
     #random we don't care as kxx=kyy
-    normal = normal_/np.linalg.norm(normal_)
-    testVector = np.array([1,1,1])
-    u = np.cross(normal,testVector)
-    if np.linalg.norm(u) < 1e-4:
-      testVector = np.array([-1,2,1])
-      u = np.cross(normal,testVector)
-    #u = np.array([2*normal[1]*normal[2],-normal[0]*normal[2],-normal[0]*normal[1]])
-    u = u/np.linalg.norm(u)
-    v = np.cross(normal,u) #we have thus u.v = normal
+    n = normal_/np.linalg.norm(normal_, axis=1)[:, np.newaxis]
+    testVector1 = np.ones((len(normal_),3), dtype="f8")
+    testVector2 = np.ones((len(normal_),3), dtype="f8")
+    testVector2[:,1] = 2
+    testVector1 = np.cross(n,testVector1)
+    testVector2 = np.cross(n,testVector2)
+    u = np.maximum(testVector1, testVector2)
+    u = u/np.linalg.norm(u, axis=1)[:, np.newaxis]
+    v = np.cross(n,u) #we have thus u.v = normal
+    
+    #u, v, normal are the basis vector
+    #P*K
+    Kxx = u[:,0]**2*Kperp + v[:,0]**2*Kperp + n[:,0]**2*Kpara
+    Kxy = u[:,0]*u[:,1]*Kperp + v[:,0]*v[:,1]*Kperp + n[:,0]*n[:,1]*Kpara
+    Kxz = u[:,0]*u[:,2]*Kperp + v[:,0]*v[:,2]*Kperp + n[:,0]*n[:,2]*Kpara
+    Kyy = u[:,1]**2*Kperp + v[:,1]**2*Kperp + n[:,1]**2*Kpara
+    Kyz = u[:,1]*u[:,2]*Kperp + v[:,1]*v[:,2]*Kperp + n[:,1]*n[:,2]*Kpara
+    Kzz = u[:,2]**2*Kperp + v[:,2]**2*Kperp + n[:,2]**2*Kpara
     
     #base change matrix P
     #we got the local coordinate expressed in the simulation base
     #P is the matrix with local vector coordinate expressed in simulation base in column
     #and X_sim = P X_local
-    P = np.append(np.array([u]).T,np.array([v]).T,axis=1)
-    P = np.append(P,np.array([normal]).T,axis=1)
-    K = P @ K @ P.T
-    
-    return K
+    #P = np.append(np.array([u]).T,np.array([v]).T,axis=1)
+    #P = np.append(P,np.array([normal]).T,axis=1)
+    #K = P @ K @ P.T
+    #return Kperp, Kperp, Kperp, Kperp, Kperp, Kpara
+    return Kxx, Kxy, Kxz, Kyy, Kyz, Kzz
   
   
   #Mourzencko function
@@ -202,50 +217,64 @@ class EDZFractureNetwork:
     return res
     
   def __phi__(self, k,l_reduced):
+    if self.iso: return 1.0
     psi_c = self.__psi_c__(k,l_reduced)
     psi_c_inf = 2/np.sinh(k) * i1(k)
     phi_inf = 2/(np.sinh(k)**2) * (i0(2*k) - i1(2*k)/k)
     return phi_inf*(psi_c/psi_c_inf)**2
     
   def __psi_perp__(self, k):
+    #in the tangential direction (parallel to wall)
     res = 3/2 * (1+(1-k/np.tanh(k))/k/k)
     return res
     
+  def __psi_perp_heterogenous__(self, k, l_reduced):
+    E = np.sqrt(k**2+1/l_reduced**2)
+    res = (1+(k/E)**2)*np.cosh(E) - 2*np.cosh(k) + np.sinh(E)/(l_reduced**2*E**3)
+    return res * 1.5 * l_reduced**2 * k/np.sinh(k)
+    
   def __psi_para__(self, k):
-    res = 3/k/k * (k/np.tanh(k)-1)
+    #in the radial direction (normal to wall)
+    res = 3/k**2 * (k/np.tanh(k)-1)
     return res
     
   
  #My reduced parameters
   def computeHydraulicLength(self):
-    if self.iso:
-      return 'TODO'
     l_r = self.attenuationLength/self.radius
     rho_0r = self.initialDensity * self.__phi__(self.concentrationParameter, l_r)*np.pi**2*self.radius**3
-    l = np.log(rho_0r/(2*self.rho_cr))
+    l = np.log(rho_0r/self.rho_cr)
+    if l < 0.: return 0.
     return self.attenuationLength*l
 
   def computeWallPermeability(self):
+    l_r = self.attenuationLength/self.radius
+    rho_0r = self.initialDensity * self.__phi__(self.concentrationParameter, l_r)*np.pi**2*self.radius**3
+    rho_diff_r = rho_0r - self.rho_cr
     if self.iso: 
-      return 'TODO'
+      num_para = self.mourzenckoAlpha * rho_diff_r **2 * self.aperture**3
+      num_perp = num_para
     else:
-      l_r = self.attenuationLength/self.radius
-      rho_0r = self.initialDensity * self.__phi__(self.concentrationParameter, l_r)*np.pi**2*self.radius**3
-      rho_diff_r = rho_0r - self.rho_cr
-      num = ( self.mourzenckoAlpha * rho_diff_r **2 * self.aperture**3 *   
+      num_para = ( self.mourzenckoAlpha * rho_diff_r **2 * self.aperture**3 *   
              self.__psi_para__(self.concentrationParameter) )
+      num_perp = ( self.mourzenckoAlpha * rho_diff_r **2 * self.aperture**3 *   
+             self.__psi_perp__(self.concentrationParameter) )
       den = 12*self.radius * self.__phi__(self.concentrationParameter, l_r) * (1+self.mourzenckoBeta * rho_diff_r )
-    return num/den
+    return np.array([num_perp/den, num_para/den]) #tangential, radial
 
   def computeAnisoFactor(self):
-    if self.iso: return 1
+    if self.iso: return 1.
     coth_k = np.cosh(self.concentrationParameter)/np.sinh(self.concentrationParameter)
     num = 2*(self.concentrationParameter*coth_k-1)
     den = self.concentrationParameter**2 - self.concentrationParameter*coth_k+1
-    return num/den
+    return 1 - num/den #0 = isotropic, 1 = highly anisotropic
     
-  def computePermeabilityFromReducedParameter(self, distance, normal):
-    return
+    
+  def compute_psi_perp_factor_homo_hetero(self):
+    k = self.concentrationParameter
+    l_r = self.attenuationLength / self.radius
+    return self.__psi_perp__(k) / self.__psi_perp_heterogenous__(k,l_r)
+    
     
   def printReducedParameter(self):
     print("\nEDZ reduced parameters")

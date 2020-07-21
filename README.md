@@ -28,7 +28,7 @@ The plugin should work as is for ASCII output. However, if you want to use the H
 2. Make sure you have an C++ compiler installed, such as GCC (https://gcc.gnu.org/). If not, install it (or update it) with the command ```sudo apt-get install gcc```.
 3. Make a symbolic link from the Salome Python folder to the ```/usr/lib/``` directory. This step is needed for GCC to compile Hh5py sources (Remplace ```$SalomeRootFolder``` by your path to Salome): 
 ```
-sudo ln -s $SalomeRootFolder/Python/lib/libpython3.6.so /usr/lib/libpython3.6.so
+sudo ln -s $SalomeRootFolder/BINARIES-UB18.04/Python/lib/libpython3.6.so /usr/lib/libpython3.6.so
 ```
 3. Setup the Salome environment with the command: 
 ```

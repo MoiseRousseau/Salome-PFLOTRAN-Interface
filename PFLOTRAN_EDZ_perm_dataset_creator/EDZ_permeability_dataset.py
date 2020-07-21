@@ -104,36 +104,25 @@ def createDistanceAndNormalDataset(mesh, surface, output):
   
 def computePermeabilityDataset(output, EDZClass, name, new_h5_file_name=''):
   src = h5py.File(output, mode='r+')
-  distance = src["Distance"]
-  normal = src["Normal"]  
+  distance = np.array(src["Distance"])
+  normal = np.array(src["Normal"]) 
   cellNumber = len(distance)
   if new_h5_file_name:
     out = h5py.File(new_h5_file_name,'w')
-    out.create_dataset('Cell Ids', data = out['Cell Ids'])
+    out.create_dataset('Cell Ids', data = src['Cell Ids'])
   else:
     out = src
   
-  if EDZClass.getAnisotropy():
-    K = np.zeros(cellNumber, dtype='f8')
-    for count in range(cellNumber):
-      K_elem = EDZClass.computePermeability(distance[count], normal[count])
-      K[count] = K_elem[0,0] #X
-    out.create_dataset(name + '_ISO', data=K)
-    
-  else:
-    K = [np.zeros(cellNumber, dtype='f8') for i in range(6)]
-    for count in range(cellNumber):
-      K_elem = EDZClass.computePermeability(distance[count], normal[count])
-      K[0][count] = K_elem[0,0] #X
-      K[1][count] = K_elem[1,1] #Y
-      K[2][count] = K_elem[2,2] #Z
-      K[3][count] = K_elem[0,1] #XY
-      K[4][count] = K_elem[0,2] #XZ
-      K[5][count] = K_elem[1,2] #YZ
-    groupsName = ('X','Y','Z','XY','XZ','YZ')
-    for i in range(len(K)):
+  if EDZClass.getAnisotropy(): #anisotropic EDZ
+    K = EDZClass.computePermeability(distance, normal)
+    groupsName = ('X','XY','XZ','Y','YZ','Z')
+    for Ki in K:
       out.create_dataset(name +groupsName[i], data=K[i])
       
+  else:
+    K = EDZClass.computePermeability(distance, normal)[0]
+    out.create_dataset(name + '_ISO', data=K)
+    
   src.close()
   return
 
@@ -342,7 +331,7 @@ def EDZPermeabilityDataset(context):
     print ("Total time to compute geometrical information: {} seconds".format(time.time()-tt))
     
     #compute perm dataset
-    print("Compute and permeability from the previous datasets")
+    print("Compute permeability from the previous datasets")
     tt=time.time()
     computePermeabilityDataset(output, EDZClass, "Perm")
 
