@@ -179,14 +179,18 @@ class EDZFractureNetwork:
   def __rotatePermeabilityTensor__(self, Kperp, Kpara, normal_):
     #found another vector perpendicular
     #random we don't care as kxx=kyy
-    n = normal_/np.linalg.norm(normal_, axis=1)[:, np.newaxis]
+    norm = np.linalg.norm(normal_, axis=1)
+    norm[norm < 1e-6] = 1.
+    n = normal_/ norm[:, np.newaxis]
     testVector1 = np.ones((len(normal_),3), dtype="f8")
     testVector2 = np.ones((len(normal_),3), dtype="f8")
     testVector2[:,1] = 2
     testVector1 = np.cross(n,testVector1)
     testVector2 = np.cross(n,testVector2)
     u = np.where(np.linalg.norm(testVector1) > np.linalg.norm(testVector2), testVector1, testVector2)
-    u = u/np.linalg.norm(u, axis=1)[:, np.newaxis]
+    norm = np.linalg.norm(u, axis=1)
+    norm[norm < 1e-6] = 1.
+    u = u/norm[:, np.newaxis]
     v = np.cross(n,u) #we have thus u.v = normal
     
     #u, v, normal are the basis vector

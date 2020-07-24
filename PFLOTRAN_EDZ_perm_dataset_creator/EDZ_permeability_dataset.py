@@ -116,8 +116,8 @@ def computePermeabilityDataset(output, EDZClass, name, new_h5_file_name=''):
   if EDZClass.getAnisotropy(): #anisotropic EDZ
     K = EDZClass.computePermeability(distance, normal)
     groupsName = ('X','XY','XZ','Y','YZ','Z')
-    for Ki in K:
-      out.create_dataset(name +groupsName[i], data=K[i])
+    for i,Ki in enumerate(K):
+      out.create_dataset(name +groupsName[i], data=Ki)
       
   else:
     K = EDZClass.computePermeability(distance, normal)[0]
