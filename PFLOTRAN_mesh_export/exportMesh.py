@@ -215,10 +215,8 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput, center0DElem=T
       center = mesh.GetNodeXYZ(node)
     else:
       center = mesh.BaryCenter(i)
-    #volume = mesh.GetVolume(i)
-    volume = common.computeVolumeFromNodeList(mesh.GetElemNodes(i),mesh)
-    if volume < 0: #Qhull error
-      volume = mesh.GetVolume(i)
+    volume = mesh.GetVolume(i)
+    #volume = common.computeVolumeFromNodeList(mesh.GetElemNodes(i),mesh)
     #write info
     out.write("%s " %int(count))
     for x in center:
