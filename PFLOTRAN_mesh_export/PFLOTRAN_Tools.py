@@ -322,6 +322,7 @@ def PFLOTRANMeshExport(context):
         #warning / error message
         if len(group) != 1:
           window.printErrorMessage('Two or more groups have the same name in Salome. Please assign different group name for each group to export and retry')
+          return
         #if SMESH.VOLUME in group[0].GetTypes() and outFormat==ASCII:
         #  window.printErrorMessage('Unable to export ' + groupNameInSalome + ' group. Volume group in ASCII output can not be read by PFLOTRAN since it is not implemented. Try to switch to HDF5 output which work')
         #  continue

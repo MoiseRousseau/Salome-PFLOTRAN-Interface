@@ -79,10 +79,12 @@ def createDistanceAndNormalDataset(mesh, surface, output):
   
   geompy = salome.geom.geomBuilder.New()
   point = geompy.MakeVertex(0, 0, 0)
+  count_progress = 0
   for count, cellId in enumerate(fatherCells):
     if cellId in cellsToExport:
       #print progression
-      common.progress_bar(count, cellNumber, barLength=50)
+      count_progress += 1
+      common.progress_bar(count_progress, cellNumber, barLength=50)
       #compute distance and normal
       D[count], normal[count] = computeNodePositionFromSurface(fatherMesh, surface, cellId, point, geompy)
     else:
@@ -334,6 +336,8 @@ def EDZPermeabilityDataset(context):
     print("Compute permeability from the previous datasets")
     tt=time.time()
     computePermeabilityDataset(output, EDZClass, "Perm")
+    
+    print("\nEND")
 
   return
 

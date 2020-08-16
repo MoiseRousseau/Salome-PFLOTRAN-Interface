@@ -26,7 +26,7 @@ import sys
 
 def progress_bar(iteration, total, barLength=50):
   #https://gist.github.com/azlux/7b8f449ac7fa308d45232c3a281be7bb
-  if iteration % int(total/50): return #update every 2%
+  if iteration % int(total/barLength): return #update every 2%
   percent = int(round((iteration / total) * 100))
   nb_bar_fill = int(round((barLength * percent) / 100))
   bar_fill = '#' * nb_bar_fill

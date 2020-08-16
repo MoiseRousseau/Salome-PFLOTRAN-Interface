@@ -192,7 +192,7 @@ def meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList,
 
 def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput, center0DElem=True):
 
-  print("Note: We use Qhull to compute the element volume since Salome has a error (https://salome-platform.org/forum/forum_10/547695356/view). We build first the convex hull and then get the volume. Thus, for non convex polyhedra, the exported volume will be false. The Salome error should be corrected on its next release.\n")
+  #print("Note: We use Qhull to compute the element volume since Salome has a error (https://salome-platform.org/forum/forum_10/547695356/view). We build first the convex hull and then get the volume. Thus, for non convex polyhedra, the exported volume will be false. The Salome error should be corrected on its next release.\n")
   
   #open pflotran output file
   out = open(PFlotranOutput, mode='w')
@@ -309,7 +309,7 @@ def meshToXDMFWhenExplicit(meshToExport, n_nodes, n_elements, nodesList, element
   temp_list = []
 
   for c in elementsList:
-    temp_list.append(16) #we say it is a polyhedron
+    temp_list.append(16) #we say it is a polyhedron, whatever it is really
     nbF = meshToExport.ElemNbFaces( c )
     temp_list.append(nbF) #write number of face 
     for f in range(0,nbF):
@@ -319,16 +319,17 @@ def meshToXDMFWhenExplicit(meshToExport, n_nodes, n_elements, nodesList, element
         
   out.create_dataset('Domain/Cells', data=np.array(temp_list, dtype=int_type))
   
+  #store cell center
+  print('Creating Domain/Cell centers dataset')
+  centers = np.zeros((n_nodes, 3), dtype='f8')
+  for i in nodesList:
+    centers = mesh.BaryCenter(i)
+  out.create_dataset('Domain/Cell centers', data=centers)
+  
   #store number of cells
   out.create_dataset('Domain/Cell_number', data=np.array([n_elements], dtype=int_type))
-  
+
   out.close()
   
-  return 1
+  return 0
   
-  
-  
-
-  
-
-
