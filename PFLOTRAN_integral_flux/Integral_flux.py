@@ -116,12 +116,6 @@ def integralFluxExport(context):
       self.ui.pb_origMeshFile.clicked.connect(self.setMeshInput)
       self.ui.pb_origOutputFile.clicked.connect(self.setOutputFile)
       self.ui.pb_okCancel.accepted.connect(self.checkValue)
-      #self.ui.rb_gridFormat[0].toggled.connect(lambda:self.excludeExplicit(self.ui.rb_gridFormat))
-      #self.ui.rb_gridFormat[1].toggled.connect(lambda:self.excludeExplicit(self.ui.rb_gridFormat))
-      #self.ui.rb_gridFormat[2].toggled.connect(lambda:self.excludeExplicit(self.ui.rb_gridFormat))
-      #self.ui.pb_OutputFile.clicked.connect(self.setOutputFile)
-      #self.ui.pb_help.clicked.connect(self.helpMessage)
-      
       #self.select()
       
       return
@@ -129,30 +123,31 @@ def integralFluxExport(context):
       
     def select(self):
       #sg.getObjectBrowser().selectionChanged.disconnect(self.select)
-      objId = salome.sg.getSelected(0)
+      objIds = salome.sg.getAllSelected()
       if self.selectMesh:
-        self._selectMeshInput(objId)
+        self._selectMeshInput(objIds)
       return
       
-    def _selectMeshInput(self, objId):
-      self.selectedMesh = salome.IDToObject(objId)
-      name = ''
-      if isinstance(self.selectedMesh,SMESH._objref_SMESH_Group) or isinstance(self.selectedMesh,SMESH._objref_SMESH_GroupOnGeom) or isinstance(self.selectedMesh,SMESH._objref_SMESH_GroupOnFilter): # or isinstance(self.selectedMesh,SMESH._objref_SMESH_subMesh) :
-        name = salome.smesh.smeshBuilder.GetName(self.selectedMesh)
+    def _selectMeshInput(self, objIds):
+      self.selectedMeshes = [salome.IDToObject(x) for x in objIds]
+      names = []
+      for selectedMesh in self.selectedMeshes:
+        name = salome.smesh.smeshBuilder.GetName(selectedMesh)
+        if (isinstance(selectedMesh,SMESH._objref_SMESH_Group) or
+      	    isinstance(selectedMesh,SMESH._objref_SMESH_GroupOnGeom) or
+      	    isinstance(selectedMesh,SMESH._objref_SMESH_GroupOnFilter) ): 
+      	    # or isinstance(selectedMesh,SMESH._objref_SMESH_subMesh) ) :
+          if selectedMesh.GetType() == SMESH.FACE:
+      	    names.append(name)
+          else:
+            print(f"Integral flux can not treat {name}: not a face group")
+        else:
+          print(f"Integral flux can not treat {name}: not a mesh group")
       
-      else:
-        print(self.selectedMesh)
-        print('Integral flux need a mesh group, or a submesh object.')
-        return
-      
-      if self.selectedMesh.GetType() != SMESH.FACE:
-        print(self.selectedMesh)
-        print('Integral flux need a surface mesh.')
-        self.ui.le_origMeshFile.setText('')
-        self.selectedMesh = None
-        return
-      
-      self.ui.le_origMeshFile.setText(name)
+      to_print = "; ".join(names)
+      if self.ui.le_origMeshFile.text() != to_print:
+        self.ui.le_origMeshFile.setText(to_print)
+        self.ui.le_origOutputFile.setText('')
       return
       
     def setMeshInput(self):
@@ -168,22 +163,19 @@ def integralFluxExport(context):
     def setOutputFile(self):
       selection = 'Integral Flux files (*.txt);;All Files (*)'
       ext = 'txt'
-      fd = QFileDialog(self, "Select an output file", self.ui.le_origOutputFile.text(), selection)
+      fd = QFileDialog(self, "Select an output file", 
+                       self.ui.le_origOutputFile.text(), selection)
+      if len(self.selectedMeshes) > 1:
+        fd.setFileMode(QFileDialog.Directory)
+      else:
+        fd.setFileMode(QFileDialog.AnyFile)
       if fd.exec_():
-        text = fd.selectedFiles()[0]
-        if text.split('.')[-1] != ext:
-          text = text + '.' + ext
+        if len(self.selectedMeshes) > 1:
+          text = fd.directory().path()+'/'
+        else:
+          text = fd.selectedFiles()[0]
+          if text.split('.')[-1] != ext: text = text + '.' + ext
         self.ui.le_origOutputFile.setText(text)
-      return
-    
-    def excludeExplicit(self, rb_list):
-      if rb_list[0].isChecked(): #exclude
-        self.ui.rb_gridFormat[1].setCheckable(False)
-        self.ui.rb_gridFormat[2].setCheckable(False)
-      if rb_list[1].isChecked(): #include
-        self.ui.rb_gridFormat[1].setCheckable(True)
-      if rb_list[2].isChecked(): #include
-        self.ui.rb_gridFormat[1].setCheckable(True)
       return
       
     def printErrorMessage(self, text):
@@ -244,8 +236,8 @@ def integralFluxExport(context):
     
     #retrieve data from the GUI
     #mesh to export
-    meshToExport = window.selectedMesh #Mesh object
-    #destination file
+    meshesToExport = window.selectedMeshes #Mesh object
+    #destination file or folder
     dest = window.ui.le_origOutputFile.text()
     #grid format
     COOR_AND_DIR = 1 ; VERTICES = 2 ; CELL_IDS = 3
@@ -262,8 +254,16 @@ def integralFluxExport(context):
     if window.ui.cb_reverse.isChecked(): reverse= True
     
     #Export selected meshes
-    print ("Create surface integral file: " + meshToExport.GetName())
-    exportSurfaceForIntegralFlux(meshToExport, dest, gridFormat, reverse, option)
+    if len(meshesToExport) > 1:
+      for meshToExport in meshesToExport:
+        name = meshToExport.GetName()
+        print ("Create surface integral file: " + name)
+        file_name = dest + name + ".txt"
+        exportSurfaceForIntegralFlux(meshesToExport[0], file_name, 
+                                     gridFormat, reverse, option)
+    else:
+      print ("Create surface integral file: " + meshToExport.GetName())
+      exportSurfaceForIntegralFlux(meshesToExport[0], dest, gridFormat, reverse, option)
     
     print ("    END \n")
     print ("####################\n\n")
