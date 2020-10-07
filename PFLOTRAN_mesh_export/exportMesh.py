@@ -216,7 +216,12 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput, center0DElem=T
     else:
       center = mesh.BaryCenter(i)
     volume = mesh.GetVolume(i)
-    #volume = common.computeVolumeFromNodeList(mesh.GetElemNodes(i),mesh)
+    if volume < 0.:
+      #print("Negative cell volume for cell {}, use Qhull instead but volume could be false if cell is non-convex".format(i))
+      #error = True
+      #volume = common.computeVolumeFromNodeList(mesh.GetElemNodes(i),mesh)
+      print(f"Negative cell volume for cell {i}, exporting absolute value instead")
+      volume = -volume
     #write info
     out.write("%s " %int(count))
     for x in center:
@@ -224,6 +229,7 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput, center0DElem=T
     out.write("%s\n" %volume)
     corresp[i]=count
     count += 1
+  
     
   #CONNECTIONS part
   print("Build connections between cells")
@@ -299,7 +305,7 @@ def meshToXDMFWhenExplicit(meshToExport, n_nodes, n_elements, nodesList, element
   #HDF5 cells
   #initialise array
   #integer length
-  print('Creating Domain/Cells dataset\n')
+  print('Creating Domain/Cells dataset')
   int_type = np.log(n_nodes)/np.log(2)/8
   if int_type <= 1: int_type = 'u1'
   elif int_type <= 2: int_type = 'u2'
@@ -320,7 +326,7 @@ def meshToXDMFWhenExplicit(meshToExport, n_nodes, n_elements, nodesList, element
   out.create_dataset('Domain/Cells', data=np.array(temp_list, dtype=int_type))
   
   #store cell center
-  print('Creating Domain/Cell centers dataset')
+  print('Creating Domain/Cell centers dataset\n')
   centers = np.zeros((n_nodes, 3), dtype='f8')
   for i in nodesList:
     centers = mesh.BaryCenter(i)

@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.special import i0, i1 #bessel function
+from scipy.integrate import quad
 
 
 
@@ -273,11 +274,20 @@ class EDZFractureNetwork:
     den = self.concentrationParameter**2 - self.concentrationParameter*coth_k+1
     return 1 - num/den #0 = isotropic, 1 = highly anisotropic
     
-    
   def compute_psi_perp_factor_homo_hetero(self):
     k = self.concentrationParameter
     l_r = self.attenuationLength / self.radius
     return self.__psi_perp__(k) / self.__psi_perp_heterogenous__(k,l_r)
+    
+  def computeBDZTransmissivity(self):
+    def tangentialPerm(R):
+      return self.computePermeability(R, None, False)[0]
+    def radialPerm(R):
+      return self.computePermeability(R, None, False)[5]
+    l_h = self.computeHydraulicLength()
+    Tradial = quad(radialPerm, 0, l_h)[0]
+    Ttangential = quad(tangentialPerm, 0, l_h)[0]
+    return Ttangential, Tradial
     
     
   def printReducedParameter(self):
@@ -286,5 +296,10 @@ class EDZFractureNetwork:
     print("Hydraulic length: {} m".format(self.computeHydraulicLength()))
     print("Wall permeability: {} m^2".format(self.computeWallPermeability()))
     return
+    
+  def returnPermeabilityVersusDistance(self):
+    R = np.linspace(0, self.computeHydraulicLength(),100)
+    Kx, Ky, Kz = self.computePermeability(R, None, False)
+    return R,Kx,Kz
 
 
