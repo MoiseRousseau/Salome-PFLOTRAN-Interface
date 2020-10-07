@@ -31,13 +31,6 @@ import importlib
 #importlib.reload(common)
 
 
-#TODO: add support for polyhedral format
-# CELLS number_of_cells
-# id nb_face nb_vertices center_coordinate volume
-# FACES number_of_faces
-# id cell_which_get_the_face number_of_point point_not_ordered face_center_coordinate area
-# VERTICES number_of_points
-# coordinates
 
 
 
@@ -230,7 +223,6 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput, center0DElem=T
     corresp[i]=count
     count += 1
   
-    
   #CONNECTIONS part
   print("Build connections between cells")
   sharedFaceDict = {}
