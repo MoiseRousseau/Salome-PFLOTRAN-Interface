@@ -259,10 +259,10 @@ def integralFluxExport(context):
         name = meshToExport.GetName()
         print ("Create surface integral file: " + name)
         file_name = dest + name + ".txt"
-        exportSurfaceForIntegralFlux(meshesToExport[0], file_name, 
+        exportSurfaceForIntegralFlux(meshToExport, file_name, 
                                      gridFormat, reverse, option)
     else:
-      print ("Create surface integral file: " + meshToExport.GetName())
+      print ("Create surface integral file: " + meshesToExport[0].GetName())
       exportSurfaceForIntegralFlux(meshesToExport[0], dest, gridFormat, reverse, option)
     
     print ("    END \n")
