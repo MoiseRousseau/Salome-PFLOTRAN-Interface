@@ -28,7 +28,7 @@ import gc
 import common
 import depreciated
 import importlib
-#importlib.reload(common)
+importlib.reload(common)
 
 
 
@@ -191,7 +191,8 @@ def meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList,
 
 
 
-def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput, center0DElem=True):
+def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput, center0DElem=True,
+                                            project_area = False):
 
   #print("Note: We use Qhull to compute the element volume since Salome has a error (https://salome-platform.org/forum/forum_10/547695356/view). We build first the convex hull and then get the volume. Thus, for non convex polyhedra, the exported volume will be false. The Salome error should be corrected on its next release.\n")
   
@@ -208,7 +209,6 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput, center0DElem=T
     elem0Ds = mesh.GetElementsByType(SMESH.ELEM0D)
     if not len(elem0Ds): center0DElem = False
     
-  center0DElem = False
   for count_center,i in enumerate(mesh.GetElementsByType(SMESH.VOLUME)):
     #get info (center and volume)
     if center0DElem:
@@ -231,14 +231,16 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput, center0DElem=T
     corresp[i]=count
     count += 1
   
+  #project_area = True #uncomment to compute projected instead of true area
   #CONNECTIONS part
   print("Build connections between cells")
   sharedFaceDict = {}
-  faceArea = {}
-  faceCenter = {}
   volIDs = mesh.GetElementsByType( SMESH.VOLUME )
   count_bar = 0
   n_elements = len(volIDs)
+  faceArea = {}
+  faceCenter = {}
+  n_faces = 0
   for v in volIDs:
     count_bar += 1
     if not count_bar % 100:
@@ -247,26 +249,35 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput, center0DElem=T
     for f in range(0,nbF):
       vFNodes = mesh.GetElemFaceNodes( v, f )
       dictKey = tuple(sorted(vFNodes))
-      if dictKey not in sharedFaceDict:
-        sharedFaceDict[ dictKey ] = [ v ]
-      else:
+      b = False
+      try:
         sharedFaceDict[ dictKey ].append( v )
-        faceArea[tuple(sharedFaceDict[ dictKey ])] = common.computeAreaFromNodeList(vFNodes,mesh)
-        faceCenter[tuple(sharedFaceDict[ dictKey ])] = common.computeCenterFromNodeList(vFNodes,mesh)
-  
+        b = True
+      except:
+        sharedFaceDict[ dictKey ] = [ v ]
+      if b:
+        b = False
+        n_faces += 1
+        area = common.computeAreaFromNodeList(vFNodes,mesh)
+        faceCenter[ dictKey ] = common.computeCenterFromNodeList(vFNodes,mesh)
+        if project_area:
+          faceNormal = common.getNormalFromNodeList(vFNodes, mesh)
+          cellCenterVector = common.computeCellCenterVectorFromCellIds(
+                                                sharedFaceDict[ dictKey ], mesh)
+          cellCenterVector /= np.linalg.norm(cellCenterVector)
+          faceArea[ dictKey ] = area * np.dot(faceNormal, cellCenterVector)
+        else:
+          faceArea[ dictKey ] = area
+      
   print('\nWrite connections')
-  num_connection = 0
-  for v in sharedFaceDict.values():
-    if len(v) == 2: num_connection += 1
-  out.write("CONNECTIONS {}\n".format(num_connection)) 
+  out.write("CONNECTIONS {}\n".format(n_faces)) 
        
-  for f,v in sharedFaceDict.items():
-    if len(v) == 2:
-      area = faceArea[tuple(v)]
-      center = faceCenter[tuple(v)]
-      out.write(str(corresp[v[0]])+ ' ' + str(corresp[v[1]]) + ' ')
-      for x in center: out.write(str(x) + ' ')
-      out.write(str(area) + '\n')
+  for keys, cellIds in sharedFaceDict.items():
+    if len(cellIds) != 2: continue
+    area = faceArea[keys]
+    center = faceCenter[keys]
+    id1,id2 = cellIds
+    out.write(f"{corresp[id1]} {corresp[id2]} {center[0]} {center[1]} {center[2]} {area}\n")
    
   out.close()
 

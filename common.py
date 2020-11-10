@@ -58,7 +58,7 @@ def getNormalFromNodeList(nodesId, mesh):
     v2 /= np.sqrt(np.dot(v2,v2))
     v3 = np.cross(v1, v2)
     i += 1
-  return v3
+  return v3/np.linalg.norm(v3)
 
  
 def computeAreaFromNodeList(nodesId,mesh):
@@ -108,6 +108,12 @@ def computeCenterFromNodeList(nodesId,mesh):
     sL += L
   center /= sL
   return center
+  
+
+def computeCellCenterVectorFromCellIds(cellIds, mesh):
+  X1,Y1,Z1 = mesh.BaryCenter(cellIds[0])
+  X2,Y2,Z2 = mesh.BaryCenter(cellIds[1])
+  return [X1-X2, Y1-Y2, Z1-Z2]
   
  
 def computeVolumeFromNodeList(nodesId, mesh):

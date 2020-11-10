@@ -21,6 +21,7 @@ from PyQt5 import QtCore
 import sys
 import os
 import importlib
+import time
 
 #import plugin component
 import exportMesh
@@ -285,6 +286,8 @@ def PFLOTRANMeshExport(context):
   result = window.result()
   
   if result:
+    start_time = time.time()
+    
     print ("\n\n\n")
     print ("##########################################\n")
     print (" PFLOTRAN mesh converter for Salome 9.4.0 \n")
@@ -343,6 +346,8 @@ def PFLOTRANMeshExport(context):
         exportSubMesh.submeshToPFLOTRAN(group, groupName, folder, name, outFormat, gridFormat)
     else:
       print("There is no group to export")
+    
+    print(f"\nTotal runtime: {time.time() - start_time}\n")
     
     print ("    END \n")
     print ("####################\n\n")
