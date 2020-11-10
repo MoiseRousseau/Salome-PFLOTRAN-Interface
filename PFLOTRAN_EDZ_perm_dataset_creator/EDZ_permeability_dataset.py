@@ -77,27 +77,37 @@ def createDistanceAndNormalDataset(mesh, surface, output):
   D = np.zeros(fatherCellNumber, dtype='f8')
   normal = np.zeros((fatherCellNumber,3), dtype='f8')
   
-  geompy = salome.geom.geomBuilder.New()
-  point = geompy.MakeVertex(0, 0, 0)
+  #create a new temp mesh to keep the cell center's
+  temp_mesh = smesh.Mesh()
+  
   count_progress = 0
   for count, cellId in enumerate(fatherCells):
     if cellId in cellsToExport:
       #print progression
       count_progress += 1
-      common.progress_bar(count_progress, cellNumber, barLength=50)
+      #common.progress_bar(count_progress, cellNumber, barLength=50) #does not work
+      if not count_progress % 2000: print(f"{count_progress} / {len(cellsToExport)}")
+      #compute cell center and add to temp_mesh_obj
+      X,Y,Z = fatherMesh.BaryCenter(cellId)
+      node_id = temp_mesh.AddNode(X,Y,Z)
       #compute distance and normal
-      D[count], normal[count] = computeNodePositionFromSurface(fatherMesh, surface, cellId, point, geompy)
+      measure = smesh.GetMinDistance(temp_mesh, surface, node_id, 0, isElem1=False, isElem2=False)
+      D[count] = measure.value
+      normal[count] = [measure.minX, measure.minY, measure.minZ]
+      temp_mesh.RemoveNodes([node_id])
     else:
       D[count] = -1
     cellIds[count] = count+1
     count += 1
      
-  #writeoutput
+  #write output
   out = h5py.File(output, mode='w')
   out.create_dataset('Cell Ids', data=cellIds)
   out.create_dataset('Distance', data=D)
   out.create_dataset('Normal', data=normal)
   out.close()
+  
+  smesh.RemoveMesh(temp_mesh)
   
   print('\n')
   
@@ -198,7 +208,9 @@ def EDZPermeabilityDataset(context):
       
     def _selectSurfaceInput(self, objId):
       self.surface = salome.IDToObject(objId)
-      if isinstance(self.surface,GEOM._objref_GEOM_Object):
+      if (isinstance(self.mesh,SMESH._objref_SMESH_Group) or
+        isinstance(self.mesh,SMESH._objref_SMESH_GroupOnGeom) or
+        isinstance(self.mesh,SMESH._objref_SMESH_GroupOnFilter)):
         name = salome.smesh.smeshBuilder.GetName(self.surface)
       else:
         return

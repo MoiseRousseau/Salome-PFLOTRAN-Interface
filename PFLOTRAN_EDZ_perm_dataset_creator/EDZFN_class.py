@@ -259,6 +259,7 @@ class EDZFractureNetwork:
     if self.iso: 
       num_para = self.mourzenckoAlpha * rho_diff_r **2 * self.aperture**3
       num_perp = num_para
+      den = 1.
     else:
       num_para = ( self.mourzenckoAlpha * rho_diff_r **2 * self.aperture**3 *   
              self.__psi_para__(self.concentrationParameter) )

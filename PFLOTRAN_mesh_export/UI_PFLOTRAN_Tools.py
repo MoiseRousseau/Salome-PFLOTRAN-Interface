@@ -141,14 +141,14 @@ class Ui_Dialog(object):
     self.gridLayout_main.addLayout(self.gridLayout_output, 5, 0)
     
     #autocompletion
-    self.gridLayout_forceFullCalculation = QtWidgets.QGridLayout(Dialog)
-    self.gridLayout_forceFullCalculation.setObjectName("gridLayout_forceFullCalculation")
+    self.gridLayout_compressH5Output = QtWidgets.QGridLayout(Dialog)
+    self.gridLayout_compressH5Output.setObjectName("gridLayout_compressH5Output")
     #enable
-    self.cb_forceFullCalculation = QtWidgets.QCheckBox(Dialog)
-    self.cb_forceFullCalculation.setObjectName("cb_forceFullCalculation")
-    self.gridLayout_forceFullCalculation.addWidget(self.cb_forceFullCalculation, 0, 0)
+    self.cb_compressH5Output = QtWidgets.QCheckBox(Dialog)
+    self.cb_compressH5Output.setObjectName("cb_compressH5Output")
+    self.gridLayout_compressH5Output.addWidget(self.cb_compressH5Output, 0, 0)
     #addlayout
-    self.gridLayout_main.addLayout(self.gridLayout_forceFullCalculation, 6, 0)
+    self.gridLayout_main.addLayout(self.gridLayout_compressH5Output, 6, 0)
     
     #ok and cancel button
     self.splitter = QtWidgets.QSplitter(Dialog)
@@ -180,7 +180,7 @@ class Ui_Dialog(object):
     self.table_header_0.setText(_translate("Dialog", "Available groups"))
     self.label_outputFormat.setText(_translate("Dialog", "Output format:"))
     self.label_gridFormat.setText(_translate("Dialog", "Grid format:"))
-    self.cb_forceFullCalculation.setText(_translate("Dialog", "Force full calculation for element's node order"))
+    self.cb_compressH5Output.setText(_translate("Dialog", "Compress HDF5 output"))
     #help
     self.pb_help.setText(_translate("Dialog", "Help"))
   

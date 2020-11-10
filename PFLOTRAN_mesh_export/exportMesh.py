@@ -34,7 +34,7 @@ import importlib
 
 
 
-def meshToPFLOTRAN(meshToExport, activeFolder, outputFileFormat, outputMeshFormat, name=None, fullCalculation = False):
+def meshToPFLOTRAN(meshToExport, activeFolder, outputFileFormat, outputMeshFormat, name=None, compressH5Output = False, fullCalculation=False):
   
   n_nodes = meshToExport.NbNodes()
   n_elements = len(meshToExport.GetElementsByType(SMESH.VOLUME))
@@ -52,7 +52,7 @@ def meshToPFLOTRAN(meshToExport, activeFolder, outputFileFormat, outputMeshForma
       
   elif outputFileFormat == 1: #HDF5
     if outputMeshFormat == 1: #Implicit
-      success = meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput, fullCalculation)
+      success = meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput, compressH5Output, fullCalculation)
     elif outputMeshFormat == 2: #Explicit
       raise RuntimeError('Explicit HDF5 exportation not implemented in PFLOTRAN')
     
@@ -120,7 +120,7 @@ def meshToPFLOTRANUntructuredASCII(meshToExport, n_nodes, n_elements, nodesList,
     
     
 
-def meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput, fullCalculation):
+def meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput, compress=False, fullCalculation=False):
   
   #open pflotran output file
   out = h5py.File(PFlotranOutput, mode='w')
@@ -160,8 +160,12 @@ def meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList,
     for j in range(len(elementNode)):
       elementsArray[count,j+1] = elementNode[j]
     count += 1
-
-  out.create_dataset('Domain/Cells', data=elementsArray)
+  
+  if compress:
+    out.create_dataset('Domain/Cells', data=elementsArray, 
+                       compression="gzip", compression_opts=9)
+  else:
+    out.create_dataset('Domain/Cells', data=elementsArray)
   del elementsArray
   gc.collect()
   
@@ -174,7 +178,11 @@ def meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList,
     vertexArray[i-1,0] = X
     vertexArray[i-1,1] = Y
     vertexArray[i-1,2] = Z
-  out.create_dataset('Domain/Vertices', data=vertexArray)
+  if compress:
+    out.create_dataset('Domain/Vertices', data=vertexArray, 
+                       compression="gzip", compression_opts=9)
+  else:
+    out.create_dataset('Domain/Vertices', data=vertexArray)
   del vertexArray
   gc.collect()
   

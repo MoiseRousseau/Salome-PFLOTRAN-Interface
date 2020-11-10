@@ -7,7 +7,7 @@ Interface the Salome CAD software (https://www.salome-platform.org/) with the fi
 *  Export mesh and groups created by Salome mesh module into a readable format by PFLOTRAN code. Various PFLOTRAN input format are implemented (ASCII and HDF5 file and unstructured implicit/explicit grid description - polyhedral to come). Export directly 3D and 2D groups as region in PFLOTRAN to easily define material repartition and boundary condition.
 * Mesh quality assessment: non-orthogonality and skewness check (experimental and slow).
 * INTEGRAL_FLUX card creator. Export 2D groups in a readily file readable by PFLOTRAN in various format: by coordinates and normal, vertices (for implicit unstructured grid only) and by cell ids.
-* Permeability dataset creator for excavated damaged zone. Given a mesh or a mesh group and a surface, compute for every cell in the considered mesh or group the distance to the considered surface and the unit vector direction, and store it into a HDF5 file. Create afterward a cell indexed dataset of permeability according to [Mourzenko et al. (2012)](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.86.026312).
+* Permeability dataset creator for excavated damaged zone. Given a 3D mesh group and a mesh group surface, compute for every cell in the considered mesh or group the distance to the considered surface and the unit vector direction, and store it into a HDF5 file. Create afterward a cell indexed dataset of permeability according to [Mourzenko et al. (2012)](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.86.026312).
 * Useful examples in the Example folder, to have a quick look at what Salome is capable of.
 
 
@@ -49,8 +49,9 @@ To export meshes from Salome to PFLOTRAN:
 1. Click on `Mesh/SMESH plugins/Salome-PFLOTRAN-Interface/Export mesh to PFLOTRAN`
 2. Select the mesh you want to export by clicking `Select` and select the mesh in Salome object browser
 3. If you want to export group as PFLOTRAN regions, click on the corresponding checkbox and use to +/- push-button to add or remove groups. You can provide region name by changing the `Name` cell value
-4. Select the desired output format and grid format (note explicit grid format with HDF output is not implemented in PFLOTRAN yet).
+4. Select the desired output format and grid format (note explicit grid format with HDF5 output is not implemented in PFLOTRAN yet).
 5. Provide an output file
+6. If output format is HDF5, you may like to compress the output to reduce the size of your HDF5 mesh. In this case, HDF5 library in PETSC and in Salome need to be compiled with the zlib library. Compression could reduce mesh size by a 10 factor in a 300K elements mesh.
 6. Press `OK` to start the exportation.
 
 Note: if you use the explicit grid format, the plugin also create another file called `..._Domain.h5`. This is intended to be used with the Python script `pflotran_explicit_binder.py`, and to allow proper visualization of your simulation. 
@@ -80,15 +81,15 @@ END
 ### Excavated damage zone permeability dataset creator
 
 Permeability dataset are created by the `Salome-PFLOTRAN-Interface/Create permeability dataset`:
-1. Select the mesh you want to assign the permeability dataset.
-2. Select the surface from which distance and unit vector will be computed.
+1. Select the mesh group you want to assign the permeability dataset.
+2. Select the surface mesh group from which distance and unit vector will be computed.
 3. Select the output file
 4. Enter the excavated zone properties: trace length, attenuation length, fracture radius, aperture and anisotropy.
 5. Select the permeability model
 6. Select the equivalent permeability coupling (only Standard - sum of fracture and matrix permeability - is implemented yet).
 7. Enter the matrix permeability and click on "Ok".
 
-The creation of the permeability dataset can be quite long. Salome need to compute for each point in the input mesh the distance to the surface. It can took around 1 hour for approximately 40000 cells.
+The creation of the permeability dataset can be quite long. Salome need to compute for each point in the input mesh the distance to the surface. Performances on a single core i7-6820HQ machine: 200K elements per hour.
 
 ## Examples
 

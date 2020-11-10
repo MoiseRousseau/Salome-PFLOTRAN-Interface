@@ -71,7 +71,7 @@ def PFLOTRANMeshExport(context):
       self.ui.pb_okCancel.accepted.connect(self.checkValue)
       self.ui.rb_outputFormat[0].toggled.connect(lambda:self.excludeExplicit(self.ui.rb_outputFormat))
       self.ui.rb_outputFormat[1].toggled.connect(lambda:self.excludeExplicit(self.ui.rb_outputFormat))
-      self.ui.rb_gridFormat[0].toggled.connect(self.excludeFullCalculation)
+      self.ui.rb_gridFormat[0].toggled.connect(self.compressOutputMesh)
       #self.ui.pb_OutputFile.clicked.connect(self.setOutputFile)
       #self.ui.pb_help.clicked.connect(self.helpMessage)
       
@@ -208,11 +208,11 @@ def PFLOTRANMeshExport(context):
         self.ui.rb_gridFormat[1].setCheckable(True)
       return
       
-    def excludeFullCalculation(self):
+    def compressOutputMesh(self):
       if self.ui.rb_gridFormat[1].isChecked():
-        self.ui.cb_forceFullCalculation.setCheckable(False)
+        self.ui.cb_compressH5Output.setCheckable(False)
       else:
-        self.ui.cb_forceFullCalculation.setCheckable(True)
+        self.ui.cb_compressH5Output.setCheckable(True)
       return
      
     def helpMessage(self):
@@ -324,7 +324,7 @@ def PFLOTRANMeshExport(context):
           window.printErrorMessage('Two or more groups have the same name in Salome. Please assign different group name for each group to export and retry')
           return
         groupsToExport.append([group[0], groupNameInOut])
-    if window.ui.cb_forceFullCalculation.isChecked() and gridFormat == IMPLICIT:
+    if window.ui.cb_compressH5Output.isChecked() and gridFormat == IMPLICIT:
       forceFullCalculation = True
     else: forceFullCalculation = False
     
