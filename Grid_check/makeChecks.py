@@ -23,6 +23,7 @@ import checkClass
 import importlib
 importlib.reload(UI_makeChecks)
 importlib.reload(checkClass)
+import salome
 
 import SMESH
 from PyQt5 import QtCore, QtGui, QtWidgets

@@ -4,8 +4,8 @@ Interface the Salome CAD software (https://www.salome-platform.org/) with the fi
 
 
 ## Features
-*  Export mesh and groups created by Salome mesh module into a readable format by PFLOTRAN code. Various PFLOTRAN input format are implemented (ASCII and HDF5 file and unstructured implicit/explicit grid description - polyhedral to come). Export directly 3D and 2D groups as region in PFLOTRAN to easily define material repartition and boundary condition.
-* Mesh quality assessment: non-orthogonality and skewness check (experimental and slow).
+*  Export mesh and groups created by Salome mesh module into a readable format by PFLOTRAN code. Various PFLOTRAN input format are implemented (ASCII and HDF5 file and unstructured implicit/explicit grid description). Export directly 3D and 2D groups as region in PFLOTRAN to easily define material repartition and boundary condition.
+* Mesh quality assessment: non-orthogonality and skewness check.
 * INTEGRAL_FLUX card creator. Export 2D groups in a readily file readable by PFLOTRAN in various format: by coordinates and normal, vertices (for implicit unstructured grid only) and by cell ids.
 * Permeability dataset creator for excavated damaged zone. Given a 3D mesh group and a mesh group surface, compute for every cell in the considered mesh or group the distance to the considered surface and the unit vector direction, and store it into a HDF5 file. Create afterward a cell indexed dataset of permeability according to [Mourzenko et al. (2012)](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.86.026312).
 * Useful examples in the Example folder, to have a quick look at what Salome is capable of.
@@ -13,16 +13,16 @@ Interface the Salome CAD software (https://www.salome-platform.org/) with the fi
 
 ## Getting Started
 
-This plugin was tested on the latest release of Salome (which is up to date 9.5.0) running on Ubuntu 19.10. Nevertheless, it should work for newer release of Salome and for other platform. Note Salome switch to Python 3 since version 9.2.0 (February 2019) and consequently, the plugin could not compatible with older Salome version than 9.2.0.
+This plugin was tested on the latest release of Salome (which is up to date 9.5.0) running on Ubuntu 20.04. Nevertheless, it should work for newer release of Salome and for other platform. Note Salome switch to Python 3 since version 9.2.0 (February 2019) and consequently, the plugin is not compatible with older Salome version than 9.2.0.
 
 ### Installation
 
 Installation of the plugin is done in three steps:
 1. Download the repository in your machine
 2. Unzip it and copy the content of the folder `Salome-PFLOTRAN-Interface` into `$HOME/.config/salome/Plugins/`
-3. You are ready to go (or you should have been)
+3. You are ready to go
 
-The plugin should work as is for ASCII output. However, if you want to use the HDF5 file output (which is a better choice at my thought - faster and less hard drive space), you may have to install the h5py module within Salome:
+Note the plugin should work as is for mesh export in ASCII output. However, if you want to use the HDF5 file output (which is a better choice at my thought - faster and less hard drive space), you may have to install the h5py module within Salome:
 
 1. Go to your Salome installation folder and open a terminal.
 2. Make sure you have an C++ compiler installed, such as GCC (https://gcc.gnu.org/). If not, install it (or update it) with the command ```sudo apt-get install gcc```.
@@ -51,16 +51,17 @@ To export meshes from Salome to PFLOTRAN:
 3. If you want to export group as PFLOTRAN regions, click on the corresponding checkbox and use to +/- push-button to add or remove groups. You can provide region name by changing the `Name` cell value
 4. Select the desired output format and grid format (note explicit grid format with HDF5 output is not implemented in PFLOTRAN yet).
 5. Provide an output file
-6. If output format is HDF5, you may like to compress the output to reduce the size of your HDF5 mesh. In this case, HDF5 library in PETSC and in Salome need to be compiled with the zlib library. Compression could reduce mesh size by a 10 factor in a 300K elements mesh.
+6. If output format is HDF5, you may like to compress the output to reduce the size of your HDF5 mesh. In this case, HDF5 library in PETSC and in Salome need to be compiled with the `zlib` library. Compression could reduce mesh size by a 10 factor in a 300K elements mesh.
 6. Press `OK` to start the exportation.
 
-Note: if you use the explicit grid format, the plugin also create another file called `..._Domain.h5`. This is intended to be used with the Python script `pflotran_explicit_binder.py`, and to allow proper visualization of your simulation. 
+Note: if you use the explicit grid format, the plugin also create another file called `..._Domain.h5`.
+It is intended to be used with the Python script `pflotran_explicit_binder.py`, and to allow proper visualization of your simulation. 
 
 ### Mesh quality 
 
 Free volume meshing (like tetrahedral meshes) are the most convenient way to generate meshes. However, PFLOTRAN use a finite volume discretization and require orthogonal mesh to be accurate. This mean all the vector linking two adjacent cells need to be normal to the face between those two cells. This condition is not meet when using tetrahedral mesh and can lead to significant error in the final solution.
 
-Mesh quality can be assessed through the `Salome-PFLOTRAN-Interface/Check mesh quality` function, which computes statistics about mesh non-orthogonality (the angle between the face normal and the two-cells centroïd vector) and mesh skewnesss (distance between face centroid and face / the two-cells centroïd vector intersection). Note this plugin is still experimental (understand here computation are slow, and show some weird results sometimes).
+Mesh quality can be assessed through the `Salome-PFLOTRAN-Interface/Check mesh quality` function, which computes statistics about mesh non-orthogonality (the angle between the face normal and the two-cells centroïd vector) and mesh skewnesss (distance between face centroid and face / the two-cells centroïd vector intersection).
 
 ### Integral flux
 

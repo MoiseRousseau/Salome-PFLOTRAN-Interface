@@ -19,14 +19,6 @@
 
 
 
-################################
-# 
-# Slightly modified version of 
-# https://github.com/FynnAschmoneit/nonOrthogonalityCheckSalome
-# 
-################################
-
-
 import numpy as np
 import SMESH
 
@@ -35,244 +27,164 @@ class MeshQualityCheck:
   def __init__(self, MESH, nonOrthThreshold = None, skewThreshold = None):
     self.mesh = MESH
     
-    if(nonOrthThreshold is None): 
-      self.nonOrthogonalThreshold = 65
-    else:
-      self.nonOrthogonalThreshold = nonOrthThreshold
-
-    if(skewThreshold is None):
-      self.skewnessThreshold = 0.5
-    else:
-      self.skewnessThreshold = skewThreshold
-    
     self.nonOrthogonalityCheck = True
     self.skewnessCheck = True
-    if( self.nonOrthogonalThreshold == 0):
-      self.nonOrthogonalityCheck = False
-    if( self.skewnessThreshold == 0):
-      self.skewnessCheck = False
-
-    self.progressOutput = True
-    self.groupsForFailedVolumePairs = True
     
     self.outputPreSting = "MeshQualityCheck:\t\t"
     self.sharedFaceDict = {}
     self.nbInternalFaces = 0
 
-    self.nonOrthogonalVolPairs = {}
+    self.orthAngle = None
+    self.skewness = None
     self.avNonOrth = 0
     self.maxNonOrth = 0
-
-    self.SkewVolPairs = {}
     self.avSkew = 0
     self.maxSkew = 0
-
-    #random.seed(1)    # for coloring of volume pair groups
-
-    if(self.progressOutput):
-      print(self.outputPreSting + "finding internal faces")
-
+    
+    self.salomeid_to_idhere = {}
+    self.face_normal = None
+    self.cell_center = None
+    self.cell_center_vector = None
+    self.cell_center_distance = None
+    return
+    
+  def getNonOrth(self):
+    return self.orthAngle
+  
+  def getSkew(self):
+    return self.skewness
+    
+  ### MESH CHECK FUNCTION ###
+  def buildInternalFaces(self):
     volIDs = self.mesh.GetElementsByType( SMESH.VOLUME )
     for v in volIDs:
       nbF = self.mesh.ElemNbFaces( v )
       for f in range(0,nbF):
         vFNodes = self.mesh.GetElemFaceNodes( v, f )
         dictKey = tuple(sorted(vFNodes))
-        if dictKey not in self.sharedFaceDict:
-          self.sharedFaceDict[ dictKey ] = [ v ]
-        else:
-          self.sharedFaceDict[ dictKey ].append( v )
-
-    self.nbInternalFaces = len(self.sharedFaceDict) 
+        try:
+          self.sharedFaceDict[ dictKey ][1] = v
+          self.nbInternalFaces += 1
+        except:
+          self.sharedFaceDict[ dictKey ] = [v , 0]
+    #0 based index for mesh element
+    count = 0
+    self.idhere_to_salomeid = {}
+    for v in volIDs:
+      self.salomeid_to_idhere[v] = count
+      self.idhere_to_salomeid[count] = v
+      count += 1
+    self.sharedFaceDict = {x:y for x,y in self.sharedFaceDict.items() if y[1]}
+    self.connections = np.array([[self.salomeid_to_idhere[x], self.salomeid_to_idhere[y]]
+                                 for x,y in self.sharedFaceDict.values()], dtype='i8')
     return
-
-  def COMsLineDist(self, v_ar):
-    bC1 = self.mesh.BaryCenter(v_ar[0])
-    p1 = np.array(bC1, dtype = 'f8')
-    bC2 = self.mesh.BaryCenter(v_ar[1])
-    p2 = np.array(bC2, dtype = 'f8')
-    line = p2 - p1
-    #print(p2,p1)
-    centerDistance = np.sqrt(np.dot(line, line))
-    return [line, centerDistance]
-
-  def faceNormalDir(self, faceCoord):
-    p1 = np.array(faceCoord[0], dtype='f8')
-    p2 = np.array(faceCoord[1], dtype='f8')
-    p3 = np.array(faceCoord[2], dtype='f8')
-    v1 = p2 - p1
-    v1 /= np.sqrt(np.dot(v1,v1))
-    v2 = p3 - p1
-    v2 /= np.sqrt(np.dot(v2,v2))
-    v3 = np.cross(v1, v2)
-    i = 3
-    while np.dot(v3,v3) < 1e-3:
-      if i == len(faceCoord): break
-      pi = np.array(faceCoord[i], dtype='f8')
-      v2 = pi - p1
-      v2 /= np.sqrt(np.dot(v2,v2))
-      v3 = np.cross(v1, v2)
-      i += 1
-    return v3
-    
-  def getAngle(self, v1, v2):
-    tol = 1e-6
-    ang = np.dot(v1,v2)/np.sqrt(np.dot(v1,v1)*np.dot(v2,v2))
-    #print(v1,v2,ang)
-    if ang > 1-tol:
-      return 0
-    elif ang < -1+tol:
-      return 0
-    ang = np.arccos(ang)
-    #print(ang)
-    ang = ang/np.pi*180
-    #print(ang)
-    if ang > 90: ang = 180 - ang
-    return ang
-
-  def checkNonOrth(self, COMsLine, fNorm, volPair, append):
-    ang = self.getAngle(COMsLine, fNorm)
-    if append:
-      self.nonOrthogonalVolPairs[ tuple(volPair) ] = ang
-    return ang
-
-  def COMofFace(self, faceCoord, nbNodesOfFace):
-    comFaceComp = np.array([0,0,0], dtype='f8')
-    for j in range(0, nbNodesOfFace):
-      comFaceComp += faceCoord[j]
-    comFaceComp /= nbNodesOfFace
-    return comFaceComp
   
-  def checkSkewness(self, pFCom, COMsLine, centerDistance, volPair, append):
-    bC1 = np.array(self.mesh.BaryCenter(volPair[0]), dtype = 'f8')
-    test = pFCom - bC1
-    a = np.dot(test,COMsLine)/centerDistance
-    b = np.sqrt(np.dot(test,test))
-    skewness = np.sqrt(b-a)/centerDistance
-    if append:
-      self.SkewVolPairs[ tuple(volPair) ] = skewness
-    return skewness
-
-  def calcAverages(self):
-    if( self.nonOrthogonalityCheck ):  
-      self.avNonOrth = np.mean(list(self.nonOrthogonalVolPairs.values()))
-      self.maxNonOrth = np.max(list(self.nonOrthogonalVolPairs.values()))
-    if( self.skewnessCheck ): 
-      self.avSkew = np.mean(list(self.SkewVolPairs.values()))
-      self.maxSkew = np.max(list(self.SkewVolPairs.values()))
+  def compute_cell_center(self):
+    volIDs = self.mesh.GetElementsByType( SMESH.VOLUME )
+    self.cell_center = np.zeros((len(volIDs), 3), dtype='f8')
+    for i,v in enumerate(volIDs):
+      self.cell_center[i] = self.mesh.BaryCenter(v)
+    return
+    
+  def compute_unit_cell_center_vector(self):
+    self.cell_center_vector = self.cell_center[self.connections[:,0],:] \
+                              - self.cell_center[self.connections[:,1],:]
+    self.cell_center_distance = np.linalg.norm(self.cell_center_vector, axis=1)
+    self.cell_center_vector /= self.cell_center_distance[:,np.newaxis]
+    return
+    
+  def compute_face_normal(self):
+    self.vertices = np.zeros((self.mesh.NbNodes(), 3), dtype='f8')
+    for i,v in enumerate(self.mesh.GetNodesId()):
+      self.vertices[i,:] = self.mesh.GetNodeXYZ(v)
+    self.face_normal = np.zeros((self.nbInternalFaces,3), dtype='f8')
+    for i,face_vs in enumerate(self.sharedFaceDict.keys()):
+      u = self.vertices[face_vs[1]-1] - self.vertices[face_vs[0]-1] #Warning, contiguous numbering
+      v = self.vertices[face_vs[2]-1] - self.vertices[face_vs[1]-1]
+      n = np.cross(u,v)
+      self.face_normal[i] = n / np.linalg.norm(n)
+    return
+    
+  def checkMesh(self):
+    print("\n")
+    print(self.outputPreSting + "checking mesh")
+      
+    # 1. build internal face
+    print(self.outputPreSting + "finding internal faces")
+    self.buildInternalFaces()
+    print(self.outputPreSting + "number of connections: ", self.nbInternalFaces)
+    
+    # 2. compute unit cell center vector
+    print(self.outputPreSting + "compute cell center")
+    self.compute_cell_center()
+    print(self.outputPreSting + "compute unit cell center vector")
+    self.compute_unit_cell_center_vector()
+    
+    # 3. compute face normal
+    print(self.outputPreSting + "compute face normal")
+    self.compute_face_normal()
+    
+    # 4. compute orthogonality angle
+    print(self.outputPreSting + "compute orthogonality angle")
+    #both face_normal and cell_center_vector are unitary
+    dot = self.face_normal[:,0] * self.cell_center_vector[:,0] \
+          + self.face_normal[:,1] * self.cell_center_vector[:,1] \
+          + self.face_normal[:,2] * self.cell_center_vector[:,2]
+    self.orthAngle = np.arccos(np.abs(dot)) * 180 / np.pi
+    self.avNonOrth = np.mean(self.orthAngle)
+    self.maxNonOrth = np.max(self.orthAngle)
+    
+    # 5. compute skewness
+    print(self.outputPreSting + "compute skewness")
+    face_center = np.zeros((self.nbInternalFaces, 3), dtype='f8')
+    for i,f_vs in enumerate(self.sharedFaceDict.keys()):
+      f_vs = [x-1 for x in f_vs]
+      face_center[i] = np.sum(self.vertices[f_vs,:],axis=0) / len(f_vs)
+    w = face_center - self.cell_center[self.connections[:,0]]
+    s = (self.face_normal[:,0] * w[:,0] + self.face_normal[:,1] * w[:,1] 
+           + self.face_normal[:,2] * w[:,2])
+    s /= (self.face_normal[:,0] * self.cell_center_vector[:,0] \
+          + self.face_normal[:,1] * self.cell_center_vector[:,1] \
+          + self.face_normal[:,2] * self.cell_center_vector[:,2])
+    P = self.cell_center[self.connections[:,0]] + s[:,np.newaxis]*self.cell_center_vector
+    self.skewness = np.linalg.norm(face_center - P, axis=1) / self.cell_center_distance
+    self.avSkew = np.mean(self.skewness)
+    self.maxSkew = np.max(self.skewness)
+ 
+    self.printStats()
     return
 
   def printStats(self):
-    print("\n%s statistics " %(self.mesh.GetName()))
-    print(self.outputPreSting + "no faces: ", self.nbInternalFaces)
-
     if( self.nonOrthogonalityCheck ):
-      #print(self.outputPreSting + "non-orthogonality threshold: ", self.nonOrthogonalThreshold)
-      #print(self.outputPreSting + "number of non-orthogonal faces: ", len(self.nonOrthogonalVolPairs))
       print(self.outputPreSting + "average non-orthogonality: ", self.avNonOrth)
       print(self.outputPreSting + "max non-orthogonality: ", self.maxNonOrth)
     if( self.skewnessCheck ):
-      #print(self.outputPreSting + "skewness threshold: ", self.skewnessThreshold)
-      #print(self.outputPreSting + "number of skew faces: ", len(self.tooSkewVolPairs))
       print(self.outputPreSting + "average skewness: ", self.avSkew)
-      print(self.outputPreSting + "max skewnes: ", self.maxSkew)
+      print(self.outputPreSting + "max skewness: ", self.maxSkew)
     return
-    
+   
+   
+  ### GROUP CREATION ###
   def createNonOrthGroup(self, value):
     volToAdd = set()
-    for volPair,ang in self.nonOrthogonalVolPairs.items():
-      if ang > value:
-        volToAdd.add(volPair[0])
-        volToAdd.add(volPair[1])
+    for i,angle in enumerate(self.orthAngle):
+      if angle > value:
+        ids = self.connections[i]
+        volToAdd.add(self.idhere_to_salomeid[ids[0]])
+        volToAdd.add(self.idhere_to_salomeid[ids[1]])
     interimGroup = self.mesh.GetMesh().CreateGroup(SMESH.VOLUME, "Non-orthogonality > " + str(value) )
     interimGroup.Add(list(volToAdd))
     return
     
   def createSkewGroup(self, value):
     volToAdd = set()
-    for volPair,ang in self.SkewVolPairs.items():
-      if ang > value:
-        volToAdd.add(volPair[0])
-        volToAdd.add(volPair[1])
+    for i,skew in enumerate(self.skewness):
+      if skew > value:
+        ids = self.connections[i]
+        volToAdd.add(self.idhere_to_salomeid[ids[0]])
+        volToAdd.add(self.idhere_to_salomeid[ids[1]])
     interimGroup = self.mesh.GetMesh().CreateGroup(SMESH.VOLUME, "Skewness > " + str(value) )
     interimGroup.Add(list(volToAdd))
-    return
-  
-  def getNonOrth(self):
-    res = [x for x in self.nonOrthogonalVolPairs.values()]
-    return res
-    
-  def getSkew(self):
-    res = [x for x in self.SkewVolPairs.values()]
-    return res
-        
-  def computeHistNonOrth(self, nb_inter):
-    inters = {}
-    for i in range(nb_inter):
-      mini = i*self.maxNonOrth/nb_inter
-      maxi = (i+1)*self.maxNonOrth/nb_inter
-      inters[(mini,maxi)] = 0
-    for (volIds,ang) in self.nonOrthogonalVolPairs.items():
-      for inter in inters.keys():
-        if inter[0] < ang and ang < inter[1]:
-          inters[inter] += 1
-          break
-    return inters
-    
-  def computeHistSkew(self, nb_inter):
-    inters = {}
-    for i in range(nb_inter):
-      mini = i*self.maxSkew/nb_inter
-      maxi = (i+1)*self.maxSkew/nb_inter
-      inters[(mini,maxi)] = 0
-    for (volIds,ang) in self.SkewVolPairs.items():
-      for inter in inters.keys():
-        if inter[0] < ang and ang < inter[1]:
-          inters[inter] += 1
-          break
-    return inters
-  
-    
-  def checkMesh(self):
-    #TODO Convert this in cython ??
-    
-    #else:
-    if(self.progressOutput):
-      print(self.outputPreSting + "checking mesh")
-
-    faceIterNumber = 1
-    for k, v in self.sharedFaceDict.items():
-      if len(v) == 2:  
-      # k is the list of face node Ids for internal faces if corresponding volume vector consists of 2 elements 
-
-        # calculation line connecting volumes' centers of mass and its distance
-        COMsLine, centerDistance = self.COMsLineDist(v)
-        
-        # convert string of face node Ids k to list of corresp coordinates
-        faceIDList = list(k)
-        nbNodesOfFace = len(faceIDList)
-        faceCoord = [ self.mesh.GetNodeXYZ( faceIDList[i] ) for i in range(0, nbNodesOfFace) ]
-
-        if( self.nonOrthogonalityCheck ):
-        # calculating face normal direction
-          fNorm = self.faceNormalDir(faceCoord)
-        #calculating the angle between faceNormal and com-connecting line
-          self.checkNonOrth(COMsLine, fNorm, v, True)
-
-        if( self.skewnessCheck ):
-        #calculation skewness as the minimum distance between the com-connecting line and com of the face
-          pFCom = self.COMofFace(faceCoord, nbNodesOfFace)
-          self.checkSkewness(pFCom, COMsLine, centerDistance, v, True)
-      
-      relProg = faceIterNumber/self.nbInternalFaces*100
-      if( self.progressOutput and relProg % 5 < 99/self.nbInternalFaces  ):
-        print(self.outputPreSting + "progress: " +str(relProg//1) +"%")
-      faceIterNumber = faceIterNumber + 1
-
-    self.calcAverages()  
-    self.printStats()
-    #if( self.groupsForFailedVolumePairs ):
-    #  self.createGroupsOfPairs()
     return
 
     
