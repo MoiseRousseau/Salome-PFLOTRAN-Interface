@@ -31,9 +31,8 @@ importlib.reload(common)
 
 try:
   import h5py
-
-
-
+except:
+  pass
 
 
 def meshToPFLOTRAN(meshToExport, activeFolder, outputFileFormat, outputMeshFormat, name=None, compressH5Output = False, fullCalculation=False):

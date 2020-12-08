@@ -13,7 +13,9 @@ Interface the Salome CAD software (https://www.salome-platform.org/) with the fi
 
 ## Getting Started
 
-This plugin was tested on the latest release of Salome (which is up to date 9.5.0) running on Ubuntu 20.04. Nevertheless, it should work for newer release of Salome and for other platform. Note Salome switch to Python 3 since version 9.2.0 (February 2019) and consequently, the plugin is not compatible with older Salome version than 9.2.0.
+This plugin was tested on the latest release of Salome (which is up to date 9.6.0) running on Ubuntu 20.04. 
+Nevertheless, it should work for newer release of Salome and for other platform. 
+Note Salome switch to Python 3 since version 9.2.0 (February 2019) and consequently, the plugin is not compatible as is with Salome version older than 9.2.0.
 
 ### Installation
 
@@ -25,16 +27,26 @@ Installation of the plugin is done in three steps:
 Note the plugin should work as is for mesh export in ASCII output. However, if you want to use the HDF5 file output (which is a better choice at my thought - faster and less hard drive space), you may have to install the h5py module within Salome:
 
 1. Go to your Salome installation folder and open a terminal.
-2. Make sure you have an C++ compiler installed, such as GCC (https://gcc.gnu.org/). If not, install it (or update it) with the command ```sudo apt-get install gcc```.
-3. Make a symbolic link from the Salome Python folder to the ```/usr/lib/``` directory. This step is needed for GCC to compile h5py sources (Remplace ```$SalomeRootFolder``` by your path to Salome): 
+2. Make sure you have an C++ compiler installed, such as GCC (https://gcc.gnu.org/). If not, install it (or update it) with the command ```sudo apt install gcc``` (On Ubuntu).
+3. Install BLAS and LAPACK header:
 ```
-sudo ln -s $SalomeRootFolder/BINARIES-UB18.04/Python/lib/libpython3.6.so /usr/lib/libpython3.6.so
+sudo apt install libblas-dev liblapack-dev 
 ```
-3. Setup the Salome environment with the command: 
+4. Make a symbolic link from the Salome Python folder to the ```/usr/lib/``` directory. This step is needed for GCC to compile h5py sources (Remplace ```$SalomeRootFolder``` by your path to Salome): 
+```
+sudo ln -s $SalomeRootFolder/BINARIES-UB20.04/Python/lib/libpython3.6.so /usr/lib/libpython3.6.so
+```
+5. Setup the Salome environment with the command: 
 ```
 ./salome context
 ```
-4. Install the `h5py` module with the command: 
+6. Upgrade the `pip` version of Salome and install the whell package:
+```
+pip3 install --upgrade pip
+pip3 install wheel
+```
+7. Since Salome 9.6.0, the header file `xlocate.h` lack in Salome Python installation which results in error during h5py compilation. So you have to manually copy the header (available at the root of this repository) into the folder `$SalomeRootFolder$/BINARIES-UB20.04/Python/include/python3.6/`
+6. Finally, install the `h5py` module with the command: 
 ```
 pip3 install h5py
 ```
