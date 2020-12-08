@@ -130,6 +130,9 @@ class MeshQualityCheck:
     dot = self.face_normal[:,0] * self.cell_center_vector[:,0] \
           + self.face_normal[:,1] * self.cell_center_vector[:,1] \
           + self.face_normal[:,2] * self.cell_center_vector[:,2]
+    #correct floating point error
+    dot[dot > 1.] = 1.
+    dot[dot < -1.] = -1
     self.orthAngle = np.arccos(np.abs(dot)) * 180 / np.pi
     self.avNonOrth = np.mean(self.orthAngle)
     self.maxNonOrth = np.max(self.orthAngle)

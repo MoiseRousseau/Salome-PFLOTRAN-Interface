@@ -23,12 +23,14 @@ import sys
 import salome
 import SMESH
 import numpy as np
-import h5py
 import gc
 import common
 import depreciated
 import importlib
 importlib.reload(common)
+
+try:
+  import h5py
 
 
 

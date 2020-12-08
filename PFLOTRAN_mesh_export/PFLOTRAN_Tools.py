@@ -23,6 +23,12 @@ import os
 import importlib
 import time
 
+try:
+  import h5py
+except:
+  print("\nh5py package not installed.")
+  print("You will not be able to export in HDF5 format\n")
+
 #import plugin component
 import exportMesh
 import exportSubMesh
@@ -304,7 +310,6 @@ def PFLOTRANMeshExport(context):
     #output format
     HDF5 = 1 ; ASCII = 2
     if window.ui.rb_outputFormat[0].isChecked(): 
-      import h5py
       outFormat = HDF5
     else: outFormat = ASCII
     #grid format

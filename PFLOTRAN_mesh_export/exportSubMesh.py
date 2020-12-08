@@ -21,8 +21,9 @@
 
 import SMESH
 import numpy as np
-import h5py
 import salome
+try:
+  import h5py
 
 
 def submeshToPFLOTRAN(submesh, submeshName, activeFolder, meshFile=None, outputFileFormat=0, outputMeshFormat=0):
