@@ -127,6 +127,7 @@ If you got any difficulties in installing or using the plugin, or you would like
 
 ## Acknownlegment
 
+* **Fabian Bottcher** - For its help in testing the plugin and its bugs reporting
 * **Thomas Pabst** - My PhD supervisor
 * All of you which will use the plugin and give me feedback to improve it
 
