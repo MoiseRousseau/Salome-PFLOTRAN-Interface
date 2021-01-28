@@ -123,7 +123,7 @@ class Ui_Dialog(object):
       self.rb_gridFormatGroup.addButton(radio)
       self.gridLayout_gridFormat.addWidget(radio, 0, i+1)
     self.rb_gridFormat[0].setChecked(True)
-    self.rb_gridFormat[1].setCheckable(False)
+    self.rb_gridFormat[1].setCheckable(True)
     self.gridLayout_main.addLayout(self.gridLayout_gridFormat, 4, 0)
     
     #output

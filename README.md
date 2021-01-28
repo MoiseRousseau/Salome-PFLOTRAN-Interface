@@ -68,6 +68,7 @@ To export meshes from Salome to PFLOTRAN:
 
 Note: if you use the explicit grid format, the plugin also create another file called `..._Domain.h5`.
 It is intended to be used with the Python script `pflotran_explicit_binder.py`, and to allow proper visualization of your simulation. 
+Another note: despite implemented in the plugin, the HDF5 explicit format is not implemented in PFLOTRAN (see [here](https://bitbucket.org/pflotran/pflotran/pull-requests/383)).
 
 ### Mesh quality 
 

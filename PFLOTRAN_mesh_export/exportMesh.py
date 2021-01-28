@@ -35,34 +35,14 @@ except:
   pass
 
 
-def meshToPFLOTRAN(meshToExport, activeFolder, outputFileFormat, outputMeshFormat, name=None, compressH5Output = False, fullCalculation=False):
-  
-  n_nodes = meshToExport.NbNodes()
-  n_elements = len(meshToExport.GetElementsByType(SMESH.VOLUME))
-  nodesList = iter(range(1,n_nodes+1))
-  elementsList = iter(meshToExport.GetElementsByType(SMESH.VOLUME))
-  success = 0
-  
-  PFlotranOutput = activeFolder + name
-  if outputFileFormat == 2: #ASCII
-    if outputMeshFormat == 1: #Implicit
-      success = meshToPFLOTRANUntructuredASCII(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput, fullCalculation)
-    elif outputMeshFormat == 2: #Explicit
-      meshToXDMFWhenExplicit(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput)
-      success = meshToPFLOTRANUnstructuredExplicitASCII(meshToExport, PFlotranOutput)
-      
-  elif outputFileFormat == 1: #HDF5
-    if outputMeshFormat == 1: #Implicit
-      success = meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput, compressH5Output, fullCalculation)
-    elif outputMeshFormat == 2: #Explicit
-      raise RuntimeError('Explicit HDF5 exportation not implemented in PFLOTRAN')
+#########
+# UTILS #
+#########
     
-  return success
-  
-  
-
-
 def salomeToPFLOTRANNodeOrder(elementNumber, mesh):
+  """
+  Convert element node list from Salome to PFLOTRAN order
+  """
   nodes = mesh.GetElemNodes(elementNumber)
   elemType = mesh.GetElementGeomType(elementNumber)
   if elemType == SMESH.Entity_Tetra: #tetrahedron
@@ -83,158 +63,8 @@ def salomeToPFLOTRANNodeOrder(elementNumber, mesh):
   return nodes
   
 
-
-
-def meshToPFLOTRANUntructuredASCII(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput, fullCalculation):
-   
-  #open pflotran file
-  out = open(PFlotranOutput, 'w')
- 
-  #initiate 3D element type
-  elementCode = {4:'T', 5:'P', 6:'W', 8:'H'}
-  
-  #pflotran line 1
-  out.write(str(n_elements) + ' ' + str(n_nodes) + '\n')
-
-  #pflotran line 2 to n_element_3D +1
-  for i in elementsList:
-    
-    if fullCalculation:
-      elementNode = depreciated.OrderNodes(i, meshToExport)
-    else: elementNode = salomeToPFLOTRANNodeOrder(i, meshToExport)
-    if not elementNode: return 0 #fail
-    
-    out.write(elementCode[len(elementNode)] + ' ')
-    
-    for x in elementNode: #write
-      out.write(str(x) + ' ')
-    out.write('\n')
-  
-  #pflotran line n_element+1 to end
-  #write node coordinates
-  for i in nodesList:
-    X,Y,Z = meshToExport.GetNodeXYZ(i)
-    out.write(str(X) + ' ' + str(Y) + ' ' + str(Z) + '\n')
-  
-  out.close()
-  return 1 #success
-    
-    
-
-def meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput, compress=False, fullCalculation=False):
-  
-  #open pflotran output file
-  out = h5py.File(PFlotranOutput, mode='w')
-    
-  #initialise array
-  #integer length
-  int_type = np.log(n_nodes)/np.log(2)/8
-  if int_type <= 1: int_type = 'u1'
-  elif int_type <= 2: int_type = 'u2'
-  elif int_type <= 4: int_type = 'u4'
-  else: int_type = 'u8'
-  
-  #only linear element
-  if meshToExport.GetMeshInfo()[SMESH.Entity_Hexa]: #hexa
-    elementsArray = np.zeros((n_elements,9), dtype=int_type)
-  elif meshToExport.GetMeshInfo()[SMESH.Entity_Penta]: #prisms
-    elementsArray = np.zeros((n_elements,7), dtype=int_type)
-  elif meshToExport.GetMeshInfo()[SMESH.Entity_Pyramid]: #pyr
-    elementsArray = np.zeros((n_elements,6), dtype=int_type)
-  elif meshToExport.GetMeshInfo()[SMESH.Entity_Tetra]: #tetra
-    elementsArray = np.zeros((n_elements,5), dtype=int_type)
-  #elif meshToExport.GetMeshInfo()[4]: #tri
-  #  elementsArray = np.zeros((n_elements,4), dtype=int_type)
-  else:
-    raise RuntimeError('No linear element of dimension 3 found.')
-  
-  #hdf5 element
-  count = 0
-  print('Creating Domain/Cells dataset:')
-  for i in elementsList:
-    common.progress_bar(count, n_elements, barLength=50)
-    if fullCalculation:
-      elementNode = depreciated.OrderNodes(i, meshToExport)
-    else: elementNode = salomeToPFLOTRANNodeOrder(i, meshToExport)
-    if not elementNode: return 0 #fail
-    elementsArray[count,0] = len(elementNode)
-    for j in range(len(elementNode)):
-      elementsArray[count,j+1] = elementNode[j]
-    count += 1
-  
-  if compress:
-    out.create_dataset('Domain/Cells', data=elementsArray, 
-                       compression="gzip", compression_opts=9)
-  else:
-    out.create_dataset('Domain/Cells', data=elementsArray)
-  del elementsArray
-  gc.collect()
-  
-  
-  #hdf5 node coordinates
-  print('\nCreating Domain/Vertices dataset: ')
-  vertexArray = np.zeros((n_nodes, 3), dtype='f8')
-  for i in nodesList:
-    X,Y,Z = meshToExport.GetNodeXYZ(i)
-    vertexArray[i-1,0] = X
-    vertexArray[i-1,1] = Y
-    vertexArray[i-1,2] = Z
-  if compress:
-    out.create_dataset('Domain/Vertices', data=vertexArray, 
-                       compression="gzip", compression_opts=9)
-  else:
-    out.create_dataset('Domain/Vertices', data=vertexArray)
-  del vertexArray
-  gc.collect()
-  
-  out.close()
-  return 1 #success
-
-
-
-def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput, center0DElem=True,
-                                            project_area = False):
-
-  #print("Note: We use Qhull to compute the element volume since Salome has a error (https://salome-platform.org/forum/forum_10/547695356/view). We build first the convex hull and then get the volume. Thus, for non convex polyhedra, the exported volume will be false. The Salome error should be corrected on its next release.\n")
-  
-  #open pflotran output file
-  out = open(PFlotranOutput, mode='w')
-
-  #CELLS part
-  print("Write cell ids, center and volume")
-  n_elements = len(mesh.GetElementsByType(SMESH.VOLUME))
-  out.write("CELLS %s\n" %n_elements)
-  count = 1
-  corresp = {}
-  if center0DElem:
-    elem0Ds = mesh.GetElementsByType(SMESH.ELEM0D)
-    if not len(elem0Ds): center0DElem = False
-    
-  for count_center,i in enumerate(mesh.GetElementsByType(SMESH.VOLUME)):
-    #get info (center and volume)
-    if center0DElem:
-      node = mesh.GetElemNodes(elem0Ds[count_center])[0]
-      center = mesh.GetNodeXYZ(node)
-    else:
-      center = mesh.BaryCenter(i)
-    volume = mesh.GetVolume(i)
-    if volume < 0.:
-      #print("Negative cell volume for cell {}, use Qhull instead but volume could be false if cell is non-convex".format(i))
-      #error = True
-      #volume = common.computeVolumeFromNodeList(mesh.GetElemNodes(i),mesh)
-      print(f"Negative cell volume for cell {i}, exporting absolute value instead")
-      volume = -volume
-    #write info
-    out.write("%s " %int(count))
-    for x in center:
-      out.write("%s " %x)
-    out.write("%s\n" %volume)
-    corresp[i]=count
-    count += 1
-  
+def buildInternalFaces(mesh, project_area=False):
   #project_area = True #uncomment to compute projected instead of true area
-  #CONNECTIONS part
-  print("Build connections between cells")
   sharedFaceDict = {}
   volIDs = mesh.GetElementsByType( SMESH.VOLUME )
   count_bar = 0
@@ -269,40 +99,293 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput, center0DElem=T
           faceArea[ dictKey ] = area * np.dot(faceNormal, cellCenterVector)
         else:
           faceArea[ dictKey ] = area
+  return n_faces, sharedFaceDict, faceArea, faceCenter
+
+
+
+
+
+###################
+### MAIN DRIVER ###
+###################
+
+def meshToPFLOTRAN(meshToExport, activeFolder, outputFileFormat, outputMeshFormat, name=None, compressH5Output = False, fullCalculation=False):
+  """
+  Main driver for Salome to PFLOTRAN mesh conversion
+  """
+  n_nodes = meshToExport.NbNodes()
+  n_elements = len(meshToExport.GetElementsByType(SMESH.VOLUME))
+  nodesList = iter(range(1,n_nodes+1))
+  elementsList = iter(meshToExport.GetElementsByType(SMESH.VOLUME))
+  success = 0
+  
+  PFlotranOutput = activeFolder + name
+  if outputFileFormat == 2: #ASCII
+    if outputMeshFormat == 1: #Implicit
+      success = meshToPFLOTRANUntructuredASCII(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput)
+    elif outputMeshFormat == 2: #Explicit
+      domain_file = '.'.join(PFlotranOutput.split('.')[:-1]) + "_Domain.h5"
+      meshToXDMFWhenExplicit(meshToExport, n_nodes, n_elements, nodesList, 
+                             elementsList, domain_file)
+      success = meshToPFLOTRANUnstructuredExplicitASCII(meshToExport, PFlotranOutput)
+    elif outputMeshFormat == 3: #Polyhedra
+      success = meshToPFLOTRANUnstructuredPolyhedraASCII(meshToExport, PFlotranOutput)
       
+  elif outputFileFormat == 1: #HDF5
+    if outputMeshFormat == 1: #Implicit
+      success = meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, \
+                                               n_elements, nodesList, \
+                                               elementsList, PFlotranOutput, \
+                                               compressH5Output)
+    elif outputMeshFormat == 2: #Explicit
+      meshToPFLOTRANUnstructuredExplicitHDF5(meshToExport, PFlotranOutput)
+      domain_file = '.'.join(PFlotranOutput.split('.')[:-1]) + "_Domain.h5"
+      meshToXDMFWhenExplicit(meshToExport, n_nodes, n_elements, nodesList, elementsList, domain_file, mode="w")
+    elif outputMeshFormat == 3: #Polyhedra
+      success = meshToPFLOTRANUnstructuredPolyhedraHDF5(meshToExport, PFlotranOutput)
+    
+  return success
+  
+  
+
+
+  
+###################################
+# UNSTRUCTURED GRID FORMAT EXPORT #
+###################################
+
+def meshToPFLOTRANUntructuredASCII(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput):
+  """
+  Export a Salome mesh as PFLOTRAN implicit unstructured grid in ASCII
+  """
+  #open pflotran file
+  out = open(PFlotranOutput, 'w')
+  #initiate 3D element type
+  elementCode = {4:'T', 5:'P', 6:'W', 8:'H'}
+  #pflotran line 1
+  out.write(str(n_elements) + ' ' + str(n_nodes) + '\n')
+  #pflotran line 2 to n_element_3D +1
+  for i in elementsList:
+    elementNode = salomeToPFLOTRANNodeOrder(i, meshToExport)
+    if not elementNode: return 0 #fail
+    out.write(elementCode[len(elementNode)] + ' ')
+    for x in elementNode: #write
+      out.write(str(x) + ' ')
+    out.write('\n')
+  #pflotran line n_element+1 to end
+  #write node coordinates
+  for i in nodesList:
+    X,Y,Z = meshToExport.GetNodeXYZ(i)
+    out.write("{} {} {}\n".format(X,Y,Z))
+  out.close()
+  return 0 #success
+    
+    
+
+def meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFlotranOutput, compress=False):
+  """
+  Export a Salome mesh as PFLOTRAN implicit unstructured grid in HDF5
+  """
+  #open pflotran output file
+  out = h5py.File(PFlotranOutput, mode='w')
+    
+  #initialise array
+  #integer length
+  int_type = 'i8'
+  #only linear element
+  if meshToExport.GetMeshInfo()[SMESH.Entity_Hexa]: #hexa
+    elementsArray = np.zeros((n_elements,9), dtype=int_type)
+  elif meshToExport.GetMeshInfo()[SMESH.Entity_Penta]: #prisms
+    elementsArray = np.zeros((n_elements,7), dtype=int_type)
+  elif meshToExport.GetMeshInfo()[SMESH.Entity_Pyramid]: #pyr
+    elementsArray = np.zeros((n_elements,6), dtype=int_type)
+  elif meshToExport.GetMeshInfo()[SMESH.Entity_Tetra]: #tetra
+    elementsArray = np.zeros((n_elements,5), dtype=int_type)
+  #elif meshToExport.GetMeshInfo()[4]: #tri
+  #  elementsArray = np.zeros((n_elements,4), dtype=int_type)
+  else:
+    raise RuntimeError('No linear element of dimension 3 found.')
+  
+  #hdf5 element
+  count = 0
+  print('Creating Domain/Cells dataset:')
+  for i in elementsList:
+    common.progress_bar(count, n_elements, barLength=50)
+    elementNode = salomeToPFLOTRANNodeOrder(i, meshToExport)
+    if not elementNode: return 0 #fail
+    elementsArray[count,0] = len(elementNode)
+    for j in range(len(elementNode)):
+      elementsArray[count,j+1] = elementNode[j]
+    count += 1
+  if compress:
+    out.create_dataset('Domain/Cells', data=elementsArray, 
+                       compression="gzip", compression_opts=9)
+  else:
+    out.create_dataset('Domain/Cells', data=elementsArray)
+  del elementsArray
+  gc.collect()
+  
+  #hdf5 node coordinates
+  print('\nCreating Domain/Vertices dataset: ')
+  vertexArray = np.zeros((n_nodes, 3), dtype='f8')
+  for i in nodesList:
+    X,Y,Z = meshToExport.GetNodeXYZ(i)
+    vertexArray[i-1,0] = X
+    vertexArray[i-1,1] = Y
+    vertexArray[i-1,2] = Z
+  if compress:
+    out.create_dataset('Domain/Vertices', data=vertexArray, 
+                       compression="gzip", compression_opts=9)
+  else:
+    out.create_dataset('Domain/Vertices', data=vertexArray)
+  del vertexArray
+  gc.collect()
+  
+  out.close()
+  return 0 #success
+
+
+
+
+
+############################################
+# UNSTRUCTURED EXPLICIT GRID FORMAT EXPORT #
+############################################
+
+def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput, center0DElem=True,
+                                            project_area = False):
+  """
+  Export a Salome mesh as PFLOTRAN explicit unstructured grid in ASCII
+  """
+  #print("Note: We use Qhull to compute the element volume since Salome has a error (https://salome-platform.org/forum/forum_10/547695356/view). We build first the convex hull and then get the volume. Thus, for non convex polyhedra, the exported volume will be false. The Salome error should be corrected on its next release.\n")
+  
+  #open pflotran output file
+  out = open(PFlotranOutput, mode='w')
+
+  #CELLS part
+  print("Write cell ids, center and volume")
+  n_elements = len(mesh.GetElementsByType(SMESH.VOLUME))
+  out.write("CELLS %s\n" %n_elements)
+  count = 1
+  corresp = {}
+  if center0DElem:
+    elem0Ds = mesh.GetElementsByType(SMESH.ELEM0D)
+    if not len(elem0Ds): center0DElem = False
+    
+  for count_center,i in enumerate(mesh.GetElementsByType(SMESH.VOLUME)):
+    #get info (center and volume)
+    if center0DElem:
+      node = mesh.GetElemNodes(elem0Ds[count_center])[0]
+      center = mesh.GetNodeXYZ(node)
+    else:
+      center = mesh.BaryCenter(i)
+    volume = mesh.GetVolume(i)
+    if volume < 0.:
+      #print("Negative cell volume for cell {}, use Qhull instead but volume could be false if cell is non-convex".format(i))
+      #error = True
+      #volume = common.computeVolumeFromNodeList(mesh.GetElemNodes(i),mesh)
+      print(f"Negative cell volume for cell {i}, exporting absolute value instead")
+      volume = -volume
+    #write info
+    out.write(f"{count} {center[0]:.6e} {center[1]:.6e} {center[2]:.6e} {volume:.6e}\n")
+    corresp[i]=count
+    count += 1
+  
+  #CONNECTIONS part
+  print("Build connections between cells")
+  n_faces, sharedFaceDict, faceArea, faceCenter = buildInternalFaces(mesh, project_area)
   print('\nWrite connections')
   out.write("CONNECTIONS {}\n".format(n_faces)) 
-       
   for keys, cellIds in sharedFaceDict.items():
     if len(cellIds) != 2: continue
     area = faceArea[keys]
     center = faceCenter[keys]
     id1,id2 = cellIds
-    out.write(f"{corresp[id1]} {corresp[id2]} {center[0]} {center[1]} {center[2]} {area}\n")
+    out.write(f"{corresp[id1]} {corresp[id2]} {center[0]:.6e} {center[1]:.6e} {center[2]:.6e} {area:.6e}\n")
    
   out.close()
-
-  return 1
-
+  return 0
 
 
-def meshToPFLOTRANUnstructuredExplicitHDF5(mesh, PFlotranOutput):
-  raise RuntimeError('HDF5 unstructureed explicit seems not to be implemented in PFLOTRAN')
-  return
-  
 
-
-def meshToXDMFWhenExplicit(meshToExport, n_nodes, n_elements, nodesList, elementsList, PFLOTRANOutput):
-  print("Create XDMF file for visualisation")
-  
-  prefix = PFLOTRANOutput.split('.')[:-1]
-  PFLOTRANOutput = ''
-  for x in prefix:
-    PFLOTRANOutput += x
-  PFLOTRANOutput += "_Domain.h5"
-  
+def meshToPFLOTRANUnstructuredExplicitHDF5(mesh, PFlotranOutput, center0DElem=True,
+                                            project_area = False):
+  """
+  Export a Salome mesh as PFLOTRAN explicit unstructured grid in HDF5
+  """
+  print("\nWarning! PFLOTRAN explicit grid in HDF5 format not currently supported")
+  print("Follow this pull request for more information:")
+  print("https://bitbucket.org/pflotran/pflotran/pull-requests/383\n")
   #open pflotran output file
-  out = h5py.File(PFLOTRANOutput, mode='w')
+  out = h5py.File(PFlotranOutput, mode='w')
+  
+  #CELLS part
+  print("Write cell ids, center and volume")
+  n_elements = len(mesh.GetElementsByType(SMESH.VOLUME))
+  centers = np.zeros((n_elements,3), dtype='f8')
+  volumes = np.zeros(n_elements, dtype='f8')
+  count = 1
+  corresp = {}
+  if center0DElem:
+    elem0Ds = mesh.GetElementsByType(SMESH.ELEM0D)
+    if not len(elem0Ds): center0DElem = False
+    
+  for count_center,i in enumerate(mesh.GetElementsByType(SMESH.VOLUME)):
+    #get info (center and volume)
+    if center0DElem:
+      node = mesh.GetElemNodes(elem0Ds[count_center])[0]
+      center = mesh.GetNodeXYZ(node)
+    else:
+      center = mesh.BaryCenter(i)
+    volume = mesh.GetVolume(i)
+    if volume < 0.:
+      #print("Negative cell volume for cell {}, use Qhull instead but volume could be false if cell is non-convex".format(i))
+      #error = True
+      #volume = common.computeVolumeFromNodeList(mesh.GetElemNodes(i),mesh)
+      print(f"Negative cell volume for cell {i}, exporting absolute value instead")
+      volume = -volume
+    #write info
+    centers[count_center] = center
+    volumes[count_center] = volume
+    corresp[i]=count
+    count += 1
+  out.create_dataset("Domain/Cells/Centers",data=centers)
+  out.create_dataset("Domain/Cells/Volumes",data=volumes)
+  
+  #CONNECTIONS part
+  print("Build connections between cells")
+  n_faces, sharedFaceDict, faceArea, faceCenter = buildInternalFaces(mesh, project_area)
+  
+  ids = np.zeros((n_faces,2), dtype='i8')
+  areas = np.zeros(n_faces, dtype='f8')
+  centers = np.zeros((n_faces,3), dtype='f8')
+  
+  count = 0
+  for keys, cellIds in sharedFaceDict.items():
+    if len(cellIds) != 2: continue
+    areas[count] = faceArea[keys]
+    centers[count] = faceCenter[keys]
+    cellIds = [corresp[x] for x in cellIds]
+    ids[count] = cellIds
+    count += 1
+  
+  out.create_dataset("Domain/Connections/Areas", data=np.resize(areas,count))
+  out.create_dataset("Domain/Connections/Cell Ids", data=np.resize(ids,(count,2)))
+  out.create_dataset("Domain/Connections/Centers", data=np.resize(centers,(count,3)))
+  
+  out.close()
+  return 0
+
+
+def meshToXDMFWhenExplicit(meshToExport, n_nodes, n_elements, nodesList, 
+                           elementsList, PFLOTRANOutput, center0DElem=True, 
+                           mode="w"):
+  """
+  Create the HDF5 file so that DOMAIN_FILENAME can use it for visualization purpose
+  """
+  print("\nCreate Domain file to use with DOMAIN_FILENAME for visualization")
+  #open pflotran output file
+  out = h5py.File(PFLOTRANOutput, mode=mode)
   
   #hdf5 node coordinates
   print('Creating Domain/Vertices dataset')
@@ -318,14 +401,7 @@ def meshToXDMFWhenExplicit(meshToExport, n_nodes, n_elements, nodesList, element
   #initialise array
   #integer length
   print('Creating Domain/Cells dataset')
-  int_type = np.log(n_nodes)/np.log(2)/8
-  if int_type <= 1: int_type = 'u1'
-  elif int_type <= 2: int_type = 'u2'
-  elif int_type <= 4: int_type = 'u4'
-  else: int_type = 'u8'
-  
   temp_list = []
-
   for c in elementsList:
     temp_list.append(16) #we say it is a polyhedron, whatever it is really
     nbF = meshToExport.ElemNbFaces( c )
@@ -334,20 +410,49 @@ def meshToXDMFWhenExplicit(meshToExport, n_nodes, n_elements, nodesList, element
       vFNodes = meshToExport.GetElemFaceNodes( c, f )
       temp_list.append(len(vFNodes)) #write face length
       temp_list.extend([x-1 for x in vFNodes])
-        
-  out.create_dataset('Domain/Cells', data=np.array(temp_list, dtype=int_type))
+  out.create_dataset('Domain/Cells', data=np.array(temp_list, dtype='i8'))
+  #write number of cell in attribute
+  out["Domain/Cells"].attrs.create("Cell number", [n_elements], dtype='i8')
   
   #store cell center
-  print('Creating Domain/Cell centers dataset\n')
-  centers = np.zeros((n_nodes, 3), dtype='f8')
-  for i in nodesList:
-    centers = mesh.BaryCenter(i)
-  out.create_dataset('Domain/Cell centers', data=centers)
+  print('Creating Domain/[XC,YC,ZC] datasets\n')
+  XC = np.zeros(n_elements, dtype='f8')
+  YC = np.zeros(n_elements, dtype='f8')
+  ZC = np.zeros(n_elements, dtype='f8')
+  if center0DElem:
+    elem0Ds = meshToExport.GetElementsByType(SMESH.ELEM0D)
+    if not len(elem0Ds): center0DElem = False
+  for count_center,i in enumerate(meshToExport.GetElementsByType(SMESH.VOLUME)):
+    #get info (center and volume)
+    if center0DElem:
+      node = meshToExport.GetElemNodes(elem0Ds[count_center])[0]
+      X,Y,Z = meshToExport.GetNodeXYZ(node)
+    else:
+      X,Y,Z = meshToExport.BaryCenter(i)
+    #write info
+    XC[count_center] = X
+    YC[count_center] = Y
+    ZC[count_center] = Z
+  
+  out.create_dataset("Domain/XC", data=XC)
+  out.create_dataset("Domain/YC", data=YC)
+  out.create_dataset("Domain/ZC", data=ZC)
   
   #store number of cells
-  out.create_dataset('Domain/Cell_number', data=np.array([n_elements], dtype=int_type))
+  #out.create_dataset('Domain/Cell_number', data=np.array([n_elements], dtype="i8"))
 
   out.close()
   
   return 0
   
+
+
+############################################
+# POLYHEDRAL GRID FORMAT EXPORT #
+############################################
+
+def meshToPFLOTRANUnstructuredPolyhedraASCII(meshToExport, PFlotranOutput):
+  return 1
+  
+def meshToPFLOTRANUnstructuredPolyhedraHDF5(meshToExport, PFlotranOutput):
+  return 1

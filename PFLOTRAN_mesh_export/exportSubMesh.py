@@ -72,12 +72,13 @@ def submeshToPFLOTRAN(submesh, submeshName, activeFolder, meshFile=None, outputF
     if submeshType == SMESH.VOLUME and fatherMeshType == SMESH.VOLUME:
       if outputFileFormat == 1: #HDF5
         print("Non implemented yet") 
-        return
+        volumeSubmeshAsRegionASCII(submesh, elementsList, n_elements, activeFolder+submeshName+'.vs')
       elif outputFileFormat == 2: #ASCII
         volumeSubmeshAsRegionASCII(submesh, elementsList, n_elements, activeFolder+submeshName+'.vs')
     elif submeshType == SMESH.FACE and fatherMeshType == SMESH.VOLUME:
       if outputFileFormat == 1: #HDF5
         print('Not implemented')
+        surfaceSubmeshUnstructuredExplicit(submesh, elementsList, n_elements,  activeFolder+submeshName+'.ex')
       elif outputFileFormat == 2: #ASCII
         surfaceSubmeshUnstructuredExplicit(submesh, elementsList, n_elements,  activeFolder+submeshName+'.ex')
       return 

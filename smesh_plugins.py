@@ -54,6 +54,7 @@ if ACTIVATE_PLUGIN:
   #load grid check
   sys.path.append(path+'Grid_check/') #path to plugin component for importation
   import makeChecks
+  importlib.reload(makeChecks)
   salome_pluginsmanager.AddFunction('Salome-PFLOTRAN-Interface/Check mesh quality',
                                     'Compute statistics for mesh non orthogonality and skewness',
                                     makeChecks.checkNonOrthogonality)

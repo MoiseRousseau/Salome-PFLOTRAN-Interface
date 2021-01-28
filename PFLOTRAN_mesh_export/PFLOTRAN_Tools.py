@@ -76,8 +76,10 @@ def PFLOTRANMeshExport(context):
       self.ui.pb_addSubmesh.clicked.connect(self.addGroup)
       self.ui.pb_removeSubmesh.clicked.connect(self.removeGroup)
       self.ui.pb_okCancel.accepted.connect(self.checkValue)
-      self.ui.rb_outputFormat[0].toggled.connect(lambda:self.excludeExplicit(self.ui.rb_outputFormat))
-      self.ui.rb_outputFormat[1].toggled.connect(lambda:self.excludeExplicit(self.ui.rb_outputFormat))
+#      self.ui.rb_outputFormat[0].toggled.connect( \
+#                        lambda:self.excludeExplicit(self.ui.rb_outputFormat))
+#      self.ui.rb_outputFormat[1].toggled.connect( \
+#                        lambda:self.excludeExplicit(self.ui.rb_outputFormat))
       self.ui.rb_gridFormat[0].toggled.connect(self.compressOutputMesh)
       #self.ui.pb_OutputFile.clicked.connect(self.setOutputFile)
       #self.ui.pb_help.clicked.connect(self.helpMessage)
@@ -208,12 +210,12 @@ def PFLOTRANMeshExport(context):
         dep.removeRow(x.row())
       return
       
-    def excludeExplicit(self, rb_list):
-      if rb_list[0].isChecked(): #exclude
-        self.ui.rb_gridFormat[1].setCheckable(False)
-      if rb_list[1].isChecked(): #include
-        self.ui.rb_gridFormat[1].setCheckable(True)
-      return
+#    def excludeExplicit(self, rb_list):
+#      if rb_list[0].isChecked(): #exclude
+#        self.ui.rb_gridFormat[1].setCheckable(False)
+#      if rb_list[1].isChecked(): #include
+#        self.ui.rb_gridFormat[1].setCheckable(True)
+#      return
       
     def compressOutputMesh(self):
       if self.ui.rb_gridFormat[1].isChecked():
@@ -309,8 +311,7 @@ def PFLOTRANMeshExport(context):
     folder = window.ui.le_origOutputFile.text()[0:-len(name)]
     #output format
     HDF5 = 1 ; ASCII = 2
-    if window.ui.rb_outputFormat[0].isChecked(): 
-      outFormat = HDF5
+    if window.ui.rb_outputFormat[0].isChecked(): outFormat = HDF5
     else: outFormat = ASCII
     #grid format
     IMPLICIT = 1 ; EXPLICIT = 2
@@ -339,9 +340,9 @@ def PFLOTRANMeshExport(context):
     #Export selected meshes
     print ("Export mesh: " + meshToExport.GetName())
     success = exportMesh.meshToPFLOTRAN(meshToExport, folder, outFormat, gridFormat, name, forceFullCalculation)
-    if not success: 
-      print("Some error happen and the mesh have not been exported correctly...")
-      return
+    #if not success: 
+    #  print("Some error happen and the mesh have not been exported correctly...")
+    #  return
     
     #retrieve submesh
     if groupsToExport:
