@@ -98,11 +98,16 @@ class MeshQualityCheck:
     for i,v in enumerate(self.mesh.GetNodesId()):
       self.vertices[i,:] = self.mesh.GetNodeXYZ(v)
     self.face_normal = np.zeros((self.nbInternalFaces,3), dtype='f8')
-    for i,face_vs in enumerate(self.sharedFaceDict.keys()):
-      u = self.vertices[face_vs[1]-1] - self.vertices[face_vs[0]-1] #Warning, contiguous numbering
-      v = self.vertices[face_vs[2]-1] - self.vertices[face_vs[1]-1]
-      n = np.cross(u,v)
-      self.face_normal[i] = n / np.linalg.norm(n)
+    keys = np.array([[i for i in x[0:3]] for x in self.sharedFaceDict.keys()]) - 1
+    u = self.vertices[keys[:,1]] -  self.vertices[keys[:,0]]
+    v = self.vertices[keys[:,2]] -  self.vertices[keys[:,1]]
+    n = np.cross(u,v, axis=1)
+    self.face_normal = n / np.sqrt(np.sum(n**2, axis=1))[:,np.newaxis]
+    #for i,face_vs in enumerate(self.sharedFaceDict.keys()):
+    #  u = self.vertices[face_vs[1]-1] - self.vertices[face_vs[0]-1] #Warning, contiguous numbering
+    #  v = self.vertices[face_vs[2]-1] - self.vertices[face_vs[1]-1]
+    #  n = np.cross(u,v)
+    #  self.face_normal[i] = n / np.linalg.norm(n)
     return
     
   def checkMesh(self):
@@ -188,6 +193,16 @@ class MeshQualityCheck:
         volToAdd.add(self.idhere_to_salomeid[ids[1]])
     interimGroup = self.mesh.GetMesh().CreateGroup(SMESH.VOLUME, "Skewness > " + str(value) )
     interimGroup.Add(list(volToAdd))
+    return
+  
+  ### EXPORT STAT ###
+  def exportQuality(self, f_out):
+    if self.skewness is None: self.checkMesh()
+    out = open(f_out, 'w')
+    out.write("OrthAngle SkewnessError\n")
+    for i in range(len(self.orthAngle)):
+      out.write(f"{self.orthAngle[i]:.6e} {self.skewness[i]:.6e}\n")
+    out.close()
     return
 
     

@@ -17,7 +17,6 @@
 #
 # Author : Moise Rousseau (2020), email at moise.rousseau@polymtl.ca
 
-from PyQt5 import QtCore
 import sys
 import os
 import importlib
@@ -40,6 +39,7 @@ importlib.reload(UI_PFLOTRAN_Tools)
 
 #import salome stuff
 from salome.smesh import smeshBuilder
+from salome.gui import helper
 from qtsalome import QDialog, QMessageBox, QFileDialog, QTableWidgetItem
 import SMESH
 import salome
@@ -90,30 +90,21 @@ def PFLOTRANMeshExport(context):
       
       
     def select(self):
-      #sg.getObjectBrowser().selectionChanged.disconnect(self.select)
-      objId = salome.sg.getSelected(0)
+      mesh = helper.getSObjectSelected()[0].GetObject()
       if self.selectMesh:
-        self._selectMeshInput(objId)
+        self._selectMeshInput(mesh)
       return
       
-    def _selectMeshInput(self, objId):
-      self.selectedMesh = salome.IDToObject(objId)
+    def _selectMeshInput(self,mesh):
       name = ''
-      if isinstance(self.selectedMesh,salome.smesh.smeshBuilder.meshProxy):
-        name = salome.smesh.smeshBuilder.GetName(self.selectedMesh)
-        smesh = salome.smesh.smeshBuilder.New()
-        self.selectedMesh = smesh.Mesh(self.selectedMesh)
+      if isinstance(mesh,salome.smesh.smeshBuilder.meshProxy):
+        self.selectedMesh = mesh.GetMesh()
+        name = smeshBuilder.GetName(mesh)
         if not self.selectedMesh.GetElementsByType(SMESH.VOLUME):
           self.printErrorMessage('PFLOTRAN mesh need to 3-dimensional. Please select a 3D mesh. If you mesh is 1 or 2-dimensional, extrude it in the others direction with an unit length.')
           self.ui.le_origMeshFile.setText('')
           self.selectedMesh = None
           return
-#      elif isinstance(self.selectedMesh,SMESH._objref_SMESH_Group):
-#        name = salome.smesh.smeshBuilder.GetName(self.selectedMesh)
-#      elif isinstance(self.selectedMesh,salome.smesh.smeshBuilder.submeshProxy):
-#        name = salome.smesh.smeshBuilder.GetName(self.selectedMesh)
-#      else:
-#        return
       self.ui.le_origMeshFile.setText(name)
       return
       
@@ -319,7 +310,8 @@ def PFLOTRANMeshExport(context):
     else: gridFormat = EXPLICIT
     #group to export
     groupsToExport = []
-    if window.selectSubmesh: #and not gridFormat == EXPLICIT:
+    if window.selectSubmesh: 
+      groups = meshToExport.GetGroups()
       for row in range(window.ui.table_toExport.rowCount()):
         groupNameInSalome = window.ui.table_toExport.item(row,0).text()
         groupNameInOut = window.ui.table_toExport.item(row,1).text()
@@ -327,18 +319,22 @@ def PFLOTRANMeshExport(context):
           groupType = SMESH.VOLUME
         elif window.ui.table_toExport.item(row,2).text() == 'FACE':
           groupType = SMESH.FACE
-        group = meshToExport.GetGroupByName(groupNameInSalome, groupType)
+        count = 0
+        for group in groups:
+          if group.GetName() == groupNameInSalome:
+            count += 1
+            group_to_add = group
         #warning / error message
-        if len(group) != 1:
+        if count != 1:
           window.printErrorMessage('Two or more groups have the same name in Salome. Please assign different group name for each group to export and retry')
           return
-        groupsToExport.append([group[0], groupNameInOut])
+        groupsToExport.append([group_to_add, groupNameInOut])
     if window.ui.cb_compressH5Output.isChecked() and gridFormat == IMPLICIT:
       forceFullCalculation = True
     else: forceFullCalculation = False
     
     #Export selected meshes
-    print ("Export mesh: " + meshToExport.GetName())
+    print ("Export mesh: " + smeshBuilder.GetName(meshToExport))
     success = exportMesh.meshToPFLOTRAN(meshToExport, folder, outFormat, gridFormat, name, forceFullCalculation)
     #if not success: 
     #  print("Some error happen and the mesh have not been exported correctly...")

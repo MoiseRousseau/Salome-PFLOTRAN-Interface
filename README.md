@@ -13,7 +13,7 @@ Interface the Salome CAD software (https://www.salome-platform.org/) with the fi
 
 ## Getting Started
 
-This plugin was tested on the latest release of Salome (which is up to date 9.6.0) running on Ubuntu 20.04. 
+This plugin was tested on the latest release of Salome (which is up to date 9.7.0) running on Ubuntu 20.04. 
 Nevertheless, it should work for newer release of Salome and for other platform. 
 Note Salome switch to Python 3 since version 9.2.0 (February 2019) and consequently, the plugin is not compatible as is with Salome version older than 9.2.0.
 

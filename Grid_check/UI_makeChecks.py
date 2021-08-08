@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 
 class PlotCanvas(FigureCanvas):
   def __init__(self, parent=None, width=5, height=4, dpi=100):
-    self.fig = Figure(figsize=(width, height), dpi=dpi)
+    self.fig = Figure()#figsize=(width, height), dpi=dpi)
     self.axes = self.fig.add_subplot(111)
     self.axes.set_xlabel("Non orthogonality angle (°)")
     self.axes.set_ylabel("Number of volumes")
@@ -160,6 +160,17 @@ class Ui_Dialog(object):
     #add layout
     self.gridLayout_main.addLayout(self.gridLayout_groups, 3, 0)
     
+    ### EXPORT QUALITY
+    self.gridLayout_export = QtWidgets.QGridLayout(Dialog)
+    self.label_export = QtWidgets.QLabel(Dialog)
+    self.label_export.setObjectName("label_export")
+    self.gridLayout_export.addWidget(self.label_export, 0, 0)
+    self.pb_export = QtWidgets.QPushButton(Dialog)
+    self.pb_export.setObjectName("pb_export")
+    self.gridLayout_export.addWidget(self.pb_export, 1, 0)
+    self.gridLayout_main.addLayout(self.gridLayout_export, 4, 0)
+    
+    
     
     #ok and cancel button
     self.splitter = QtWidgets.QSplitter(Dialog)
@@ -194,7 +205,10 @@ class Ui_Dialog(object):
     self.label_group_skew.setText(_translate("Dialog", "Create a group for skewness > "))
     self.pb_group_no.setText(_translate("Dialog", "Make group"))
     self.pb_group_skew.setText(_translate("Dialog", "Make group"))
-  
+    
+    #export
+    self.label_export.setText(_translate("Dialog","Export quality to file:"))
+    self.pb_export.setText(_translate("Dialog","Export"))
   
   def setDefaultValue(self):
     pass

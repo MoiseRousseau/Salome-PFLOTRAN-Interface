@@ -28,7 +28,8 @@ import salome
 import SMESH
 from PyQt5 import QtCore, QtGui, QtWidgets
 from salome.smesh import smeshBuilder
-from qtsalome import QDialog
+from salome.gui import helper
+from qtsalome import QDialog, QFileDialog
 
 
 def checkNonOrthogonality(context):
@@ -50,19 +51,21 @@ def checkNonOrthogonality(context):
       self.ui.pb_compute.clicked.connect(self.computeStats)
       self.ui.pb_group_no.clicked.connect(self.makeNonOrthGroup)
       self.ui.pb_group_skew.clicked.connect(self.makeSkewGroup)
-      
+      self.ui.pb_export.clicked.connect(self.saveQuality)
+      # make check object
+      self.MQC = None
       return
       
     ### MESH SELECTION
     def select(self):
       #sg.getObjectBrowser().selectionChanged.disconnect(self.select)
-      objId = salome.sg.getSelected(0)
+      mesh = helper.getSObjectSelected()[0].GetObject()
       if self.selectMesh:
-        self._selectMeshInput(objId)
+        self._selectMeshInput(mesh)
       return
       
-    def _selectMeshInput(self, objId):
-      self.selectedMesh = salome.IDToObject(objId)
+    def _selectMeshInput(self, mesh):
+      self.selectedMesh = mesh
       name = ''
       if isinstance(self.selectedMesh,salome.smesh.smeshBuilder.meshProxy):
         name = salome.smesh.smeshBuilder.GetName(self.selectedMesh)
@@ -98,15 +101,31 @@ def checkNonOrthogonality(context):
       
     ### GROUP
     def makeNonOrthGroup(self):
+      if self.MQC is None: self.computeStats()
       self.MQC.createNonOrthGroup(float(self.ui.le_group_no.text()))
       if salome.sg.hasDesktop():
         salome.sg.updateObjBrowser()
       return
       
     def makeSkewGroup(self):
+      if self.MQC is None: self.computeStats()
       self.MQC.createSkewGroup(float(self.ui.le_group_skew.text()))
       if salome.sg.hasDesktop():
         salome.sg.updateObjBrowser()
+      return
+    
+    ### EXPORT
+    def saveQuality(self):
+      dialog = QFileDialog()
+      f_out = dialog.getSaveFileName(None, "Select an output filename", 
+                                     "", "Text file (*.txt)")
+      f_out = f_out[0]
+      if not f_out:
+        return
+      if f_out[-4:] != ".txt":
+        f_out += ".txt"
+      if self.MQC is None: self.computeStats()
+      self.MQC.exportQuality(f_out)
       return
       
   

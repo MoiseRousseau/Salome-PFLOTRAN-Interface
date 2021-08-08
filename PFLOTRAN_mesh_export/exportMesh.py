@@ -71,6 +71,7 @@ def buildInternalFaces(mesh, project_area=False):
   n_elements = len(volIDs)
   faceArea = {}
   faceCenter = {}
+  faceNormal = {}
   n_faces = 0
   for v in volIDs:
     count_bar += 1
@@ -91,15 +92,16 @@ def buildInternalFaces(mesh, project_area=False):
         n_faces += 1
         area = common.computeAreaFromNodeList(vFNodes,mesh)
         faceCenter[ dictKey ] = common.computeCenterFromNodeList(vFNodes,mesh)
+        normal = common.getNormalFromNodeList(vFNodes, mesh)
+        faceNormal[dictKey] = normal
         if project_area:
-          faceNormal = common.getNormalFromNodeList(vFNodes, mesh)
           cellCenterVector = common.computeCellCenterVectorFromCellIds(
                                                 sharedFaceDict[ dictKey ], mesh)
           cellCenterVector /= np.linalg.norm(cellCenterVector)
-          faceArea[ dictKey ] = area * np.dot(faceNormal, cellCenterVector)
+          faceArea[ dictKey ] = area * np.dot(normal, cellCenterVector)
         else:
           faceArea[ dictKey ] = area
-  return n_faces, sharedFaceDict, faceArea, faceCenter
+  return n_faces, sharedFaceDict, faceArea, faceCenter, faceNormal
 
 
 
@@ -190,21 +192,7 @@ def meshToPFLOTRANUnstructuredHDF5(meshToExport, n_nodes, n_elements, nodesList,
   out = h5py.File(PFlotranOutput, mode='w')
     
   #initialise array
-  #integer length
-  int_type = 'i8'
-  #only linear element
-  if meshToExport.GetMeshInfo()[SMESH.Entity_Hexa]: #hexa
-    elementsArray = np.zeros((n_elements,9), dtype=int_type)
-  elif meshToExport.GetMeshInfo()[SMESH.Entity_Penta]: #prisms
-    elementsArray = np.zeros((n_elements,7), dtype=int_type)
-  elif meshToExport.GetMeshInfo()[SMESH.Entity_Pyramid]: #pyr
-    elementsArray = np.zeros((n_elements,6), dtype=int_type)
-  elif meshToExport.GetMeshInfo()[SMESH.Entity_Tetra]: #tetra
-    elementsArray = np.zeros((n_elements,5), dtype=int_type)
-  #elif meshToExport.GetMeshInfo()[4]: #tri
-  #  elementsArray = np.zeros((n_elements,4), dtype=int_type)
-  else:
-    raise RuntimeError('No linear element of dimension 3 found.')
+  elementsArray = np.zeros((n_elements,9), dtype='i8')
   
   #hdf5 element
   count = 0
@@ -293,7 +281,7 @@ def meshToPFLOTRANUnstructuredExplicitASCII(mesh, PFlotranOutput, center0DElem=T
   
   #CONNECTIONS part
   print("Build connections between cells")
-  n_faces, sharedFaceDict, faceArea, faceCenter = buildInternalFaces(mesh, project_area)
+  n_faces, sharedFaceDict, faceArea, faceCenter, faceNormal = buildInternalFaces(mesh, project_area)
   print('\nWrite connections')
   out.write("CONNECTIONS {}\n".format(n_faces)) 
   for keys, cellIds in sharedFaceDict.items():
@@ -354,24 +342,29 @@ def meshToPFLOTRANUnstructuredExplicitHDF5(mesh, PFlotranOutput, center0DElem=Tr
   
   #CONNECTIONS part
   print("Build connections between cells")
-  n_faces, sharedFaceDict, faceArea, faceCenter = buildInternalFaces(mesh, project_area)
+  n_faces, sharedFaceDict, faceArea, faceCenter, faceNormal = buildInternalFaces(mesh, project_area)
   
   ids = np.zeros((n_faces,2), dtype='i8')
   areas = np.zeros(n_faces, dtype='f8')
   centers = np.zeros((n_faces,3), dtype='f8')
+  normals = np.zeros((n_faces,3), dtype='f8')
   
   count = 0
+  print("Get face cell ids, areas, centers and normals")
   for keys, cellIds in sharedFaceDict.items():
     if len(cellIds) != 2: continue
     areas[count] = faceArea[keys]
     centers[count] = faceCenter[keys]
+    normals[count] = faceNormal[keys]
     cellIds = [corresp[x] for x in cellIds]
     ids[count] = cellIds
     count += 1
   
+  print("Write face cell ids, areas, centers and normals")
   out.create_dataset("Domain/Connections/Areas", data=np.resize(areas,count))
   out.create_dataset("Domain/Connections/Cell Ids", data=np.resize(ids,(count,2)))
   out.create_dataset("Domain/Connections/Centers", data=np.resize(centers,(count,3)))
+  out.create_dataset("Domain/Connections/Normals", data=np.resize(normals,(count,3)))
   
   out.close()
   return 0
