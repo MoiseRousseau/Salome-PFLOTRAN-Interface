@@ -4,7 +4,9 @@ Interface the Salome CAD software (https://www.salome-platform.org/) with the fi
 
 
 ## Features
-*  Export mesh and groups created by Salome mesh module into a readable format by PFLOTRAN code. Various PFLOTRAN input format are implemented (ASCII and HDF5 file and unstructured implicit/explicit grid description). Export directly 3D and 2D groups as region in PFLOTRAN to easily define material repartition and boundary condition.
+*  Export mesh and groups created by Salome mesh module into a readable format by PFLOTRAN code. Various PFLOTRAN input format are implemented (ASCII and HDF5 file and unstructured implicit/explicit grid description). 
+Export directly 3D and 2D groups as region in PFLOTRAN to easily define material repartition and boundary condition.
+* Read back a mesh into Salome (only tested in HDF5 implicit format)
 * Mesh quality assessment: non-orthogonality and skewness check.
 * INTEGRAL_FLUX card creator. Export 2D groups in a readily file readable by PFLOTRAN in various format: by coordinates and normal, vertices (for implicit unstructured grid only) and by cell ids.
 * Permeability dataset creator for excavated damaged zone. Given a 3D mesh group and a mesh group surface, compute for every cell in the considered mesh or group the distance to the considered surface and the unit vector direction, and store it into a HDF5 file. Create afterward a cell indexed dataset of permeability according to [Mourzenko et al. (2012)](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.86.026312).

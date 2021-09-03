@@ -301,9 +301,7 @@ def meshToPFLOTRANUnstructuredExplicitHDF5(mesh, PFlotranOutput, center0DElem=Tr
   """
   Export a Salome mesh as PFLOTRAN explicit unstructured grid in HDF5
   """
-  print("\nWarning! PFLOTRAN explicit grid in HDF5 format not currently supported")
-  print("Follow this pull request for more information:")
-  print("https://bitbucket.org/pflotran/pflotran/pull-requests/383\n")
+  print("\nWarning! PFLOTRAN explicit grid in HDF5 format only supported in developpement version")
   #open pflotran output file
   out = h5py.File(PFlotranOutput, mode='w')
   

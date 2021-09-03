@@ -334,6 +334,8 @@ def PFLOTRANMeshExport(context):
     else: forceFullCalculation = False
     
     #Export selected meshes
+    smesh = smeshBuilder.New()
+    meshToExport = smesh.Mesh(meshToExport)
     print ("Export mesh: " + smeshBuilder.GetName(meshToExport))
     success = exportMesh.meshToPFLOTRAN(meshToExport, folder, outFormat, gridFormat, name, forceFullCalculation)
     #if not success: 
