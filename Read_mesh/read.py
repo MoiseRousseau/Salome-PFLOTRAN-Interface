@@ -22,6 +22,7 @@ from salome.smesh import smeshBuilder
 from qtsalome import QFileDialog, QMessageBox
 import numpy as np
 import h5py
+import os
 
 
 
@@ -58,12 +59,31 @@ def read_ugi(src):
   elem = np.zeros((n_e,8),dtype='i8')
   for iline in range(n_e):
     line = [int(x) for x in mesh.readline().split()[1:]]
-    elem[0:len(line)] = line
+    elem[iline,:len(line)] = line
   vert = np.zeros((n_v,3),dtype='i8')
   for iline in range(n_v):
-    vert[0:len(line)] = [float(x) for x in mesh.readline().split()]
+    vert[iline] = [float(x) for x in mesh.readline().split()]
   mesh.close()
-  return vert, elem
+  #groups
+  folder = '/'.join(src.split('/')[:-1])
+  list_file = os.listdir(folder)
+  s_grps = [x for x in list_file if x.split('.')[-1] == "ss"]
+  v_grps = [x for x in list_file if x.split('.')[-1] == "vs"]
+  grps = {}
+  for grp in s_grps:
+    name = grp.split("/")[-1].split(".")[:-1][0]
+    src = open(grp, 'r')
+    n_face = int(src.readline())
+    array = np.zeros((n_face,4), dtype='i8')
+    for i in range(n_face):
+      line = src.readline().split()
+      array[i] = [int(x) for x in line[1:]]
+    grps[name] = array
+    src.close()
+  for grp in v_grps:
+    name = grp.split("/")[-1].split(".")[:-1][0]
+    grps[name] = np.genfromtxt(grp, skip_header=1)
+  return vert, elem, grps
   
 def read_h5(src):
   mesh = h5py.File(src, 'r')
@@ -72,8 +92,15 @@ def read_h5(src):
   #if len(elem.shape) == 1:
   #  print("Flat element array, reshape it")
   #  elem = elem_reshape(elem)
+  grps = {}
+  if "Regions" in mesh.keys(): 
+    for reg in list(mesh["Regions"].keys()):
+      if "Vertex Ids" in mesh[f"Regions/{reg}"].keys(): #face group
+        grps[reg] = np.array(mesh[f"Regions/{reg}/Vertex Ids"])[:,1:]
+      else:
+        grps[reg] = np.array(mesh[f"Regions/{reg}/Cell Ids"])
   mesh.close()
-  return vert, elem
+  return vert, elem, grps
 
 
 def pflotran_to_salome_order(n):
@@ -86,6 +113,9 @@ def pflotran_to_salome_order(n):
     new_nodes = [n[3],n[4],n[5],n[0],n[1],n[2]]
   elif len(n) == 8:
     new_nodes = [n[0],n[3],n[2],n[1],n[4],n[7],n[6],n[5]]
+  else:
+    print("what this nodes ?")
+    print(n)
   return new_nodes
   
 
@@ -109,9 +139,9 @@ def pflotran_read(context):
   #read mesh
   print("Read mesh")
   if ext == "ugi":
-    vert, elem = read_ugi(src)
+    vert, elem, grps = read_ugi(src)
   else:
-    vert, elem = read_h5(src)
+    vert, elem, grps = read_h5(src)
   print(f"Read {len(vert)} vertices and {len(elem)} cells")
   
   #publish mesh
@@ -126,12 +156,18 @@ def pflotran_read(context):
     M.AddVolume(pflotran_to_salome_order(cell))
       
   print("Create groups")
-  if ext == 'h5':
-    mesh = h5py.File(src,'r')
-    if "Regions" in mesh.keys(): 
-      for reg in list(mesh["Regions"].keys()):
-        grp = M.CreateEmptyGroup(SMESH.VOLUME, reg)
-        grp.Add([int(x) for x in np.array(mesh[f"Regions/{reg}/Cell Ids"])])
+  for grp_name,grp in grps.items():
+    if len(grp.shape) == 2: #face
+      grp_salome = M.CreateEmptyGroup(SMESH.FACE, grp_name)
+      indexes = [0 for x in grp]
+      for iface,face in enumerate(grp):
+        indexes[iface] = M.AddFace([int(x) for x in face])
+      grp_salome.Add(indexes)
+      print("Add faces group: " + grp_name)
+    else:
+      grp_salome = M.CreateEmptyGroup(SMESH.VOLUME, grp_name)
+      grp_salome.Add([int(x) for x in grp])
+      print("Add cells group: " + grp_name)
   
   if salome.sg.hasDesktop():
     salome.sg.updateObjBrowser()
